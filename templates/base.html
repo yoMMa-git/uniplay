@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+{% load static %} 
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}UniPlay{% endblock %}</title>
+  <link href="{% static 'bootstrap.min.css' %}" rel="stylesheet" />
+  <script src="{% static 'htmx.min.js' %}"></script>
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand navbar-dark bg-dark">
+  <a class="navbar-brand ms-3" href="/">UniPlay</a>
+  {% if user.is_authenticated %}
+    <span class="navbar-text text-white ms-auto me-3">Вы: {{ user.username }}</span>
+    <a class="btn btn-outline-light position-absolute top-0 end-0 m-3" href="{% url 'logout' %}">Выйти</a>
+  {% endif %}
+</nav>
+<div class="container py-4">{% block content %}{% endblock %}</div>
+</body>
+</html>

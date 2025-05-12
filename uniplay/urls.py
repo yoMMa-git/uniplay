@@ -21,9 +21,15 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.tournament.views_site import login_view, dashboard, logout_view, register_view
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("apps.tournament.urls")),
+    path("login/", login_view, name="login"),
+    path("logout/", logout_view, name="logout"),
+    path("dashboard/", dashboard, name="dashboard"),
+    path("regiser/", register_view, name="register")
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 '''

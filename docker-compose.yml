@@ -10,7 +10,7 @@ services:
     env_file: .env
     volumes:
       - .:/code
-      - static_volume:/code/static
+      - static_volume:/code/staticfiles
       - media_volume:/code/media
     depends_on:
       - db
