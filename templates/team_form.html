@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Новая команда{% endblock %}
+{% block content %}
+<h2>Создать команду</h2>
+<form method="post" enctype="multipart/form-data" class="mb-3">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary">Сохранить</button>
+  <a class="btn btn-secondary" href="{% url 'dashboard' %}">Отмена</a>
+</form>
+{% endblock %}

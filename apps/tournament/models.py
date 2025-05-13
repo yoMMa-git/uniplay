@@ -50,6 +50,8 @@ class Tournament(models.Model):
                                         limit_choices_to={"role": Role.MODERATOR})
     referees = models.ManyToManyField(User, related_name="refereed",
                                       limit_choices_to={"role": Role.REFEREE})
+    teams = models.ManyToManyField(
+        Team, blank=True, related_name="tournaments", help_text="Команды, зарегистрированные на турнир")
 
     def __str__(self):
         return self.title

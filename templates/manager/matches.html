@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Матчи моих команд{% endblock %}
+{% block content %}
+<h2 class="mb-3">Матчи моих команд</h2>
+
+{% if matches %}
+  <table class="table table-bordered">
+    <thead><tr>
+      <th>Турнир</th><th>Раунд</th><th>Команда A</th><th>Команда B</th><th>Счёт</th>
+    </tr></thead>
+    <tbody>
+      {% for m in matches %}
+        <tr>
+          <td>{{ m.tournament.title }}</td>
+          <td>{{ m.round }}</td>
+          <td>{{ m.team_a }}</td>
+          <td>{{ m.team_b }}</td>
+          <td>{{ m.score_a }} : {{ m.score_b }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>Пока нет матчей с участием ваших команд.</p>
+{% endif %}
+{% endblock %}

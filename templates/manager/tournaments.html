@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Турниры{% endblock %}
+{% block content %}
+<h2>Турниры</h2>
+
+<table class="table">
+  <thead><tr><th>Название</th><th>Сетка</th><th>Действие</th></tr></thead>
+  <tbody>
+  {% for tourney in tournaments %}
+    <tr>
+      <td>{{ tourney.title }}</td>
+      <td>{{ tourney.get_bracket_type_display }}</td>
+      <td>
+        {% if tourney.registration_open %}
+          <button class="btn btn-sm btn-outline-primary"
+                  data-toggle="modal"
+                  data-target="#regModal{{ tourney.id }}">
+            Зарегистрировать
+          </button>
+
+          {# ─── Modal ─────────────────────────────────── #}
+          <div class="modal fade" id="regModal{{ tourney.id }}" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <form method="post" action="{% url 'team_register' tourney.id %}">
+                  {% csrf_token %}
+                  <div class="modal-header">
+                    <h5 class="modal-title">Регистрация в «{{ tourney.title }}»</h5>
+                    <button type="button" class="close"
+                            data-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <label for="teamSelect{{ tourney.id }}" class="form-label">Выберите команду</label>
+                    <select id="teamSelect{{ tourney.id }}" name="team_id"
+                            class="form-select">
+                      {% for team in my_teams %}
+                        {% if team not in tourney.teams.all %}
+                          <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endif %}
+                      {% empty %}
+                        <option disabled>Нет доступных команд</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Зарегистрировать</button>
+                    <button type="button" class="btn btn-secondary"
+                            data-dismiss="modal">Отмена</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <span class="text-muted">Регистрация закрыта</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

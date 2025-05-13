@@ -50,6 +50,7 @@
   {% endif %}
 
 {% elif user.role == 'manager' %}
+  <a class="btn btn-success mb-3" href="{% url 'team_create' %}">Добавить команду</a>
   <h4>Ваши команды</h4>
   {% if my_teams %}
     <ul class="list-group">

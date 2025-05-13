@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Мои команды{% endblock %}
+{% block content %}
+<h2 class="mb-3">Мои команды</h2>
+<a href="{% url 'team_create' %}" class="btn btn-success mb-3">Добавить команду</a>
+
+{% if teams %}
+  <table class="table table-striped">
+    <thead><tr><th>Название</th><th>Игроков</th></tr></thead>
+    <tbody>
+      {% for t in teams %}
+        <tr>
+          <td>{{ t.name }}</td>
+          <td>{{ t.members.count }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>У вас пока нет команд.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<h2 class="mb-3">Личный кабинет</h2>
+<form id="profileForm" method="post" enctype="multipart/form-data" class="mb-3">
+  {% csrf_token %}
+  {{ form.as_p }}
+
+  {% if edit_mode %}
+    <button class="btn btn-primary me-2">Сохранить</button>
+    <a href="{% url 'profile' %}" class="btn btn-secondary">Отмена</a>
+  {% else %}
+    <a href="{% url 'profile' %}?edit=1" class="btn btn-outline-secondary">Изменить</a>
+  {% endif %}
+</form>
+{% endblock %}

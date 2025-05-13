@@ -21,21 +21,37 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
-from apps.tournament.views_site import login_view, dashboard, logout_view, register_view
+from apps.tournament.views_site import login_view, dashboard, logout_view, register_view, profile_view
+from apps.tournament.views_site import tournaments_for_manager, my_teams, manager_matches, create_team, register_team
 
 urlpatterns = [
+    path("", login_view, name="login"),
     path("admin/", admin.site.urls),
     path("api/", include("apps.tournament.urls")),
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
     path("dashboard/", dashboard, name="dashboard"),
-    path("regiser/", register_view, name="register")
+    path("register/", register_view, name="register"),
+    path("profile/", profile_view, name="profile"),
+    path("team/create/", create_team, name="team_create"),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+'''
+Manager pages
+'''
+urlpatterns += [
+    path("manager/tournaments/", tournaments_for_manager,
+         name="manager_tournaments"),
+    path("manager/teams/", my_teams, name="manager_teams"),
+    path("manager/matches/", manager_matches, name="manager_matches"),
+    path("manager/tournaments/<int:tournament_id>/register/",
+         register_team, name="team_register"),
+]
+
 
 '''
 Literally no idea what this code does
 '''
-
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL,
                           document_root=settings.MEDIA_ROOT)
