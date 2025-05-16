@@ -10,8 +10,7 @@ from apps.tournament.models import Team, Match, Tournament, BracketType
 class BracketFactory:
     def __init__(self, tournament: Tournament):
         self.tournament = tournament
-        self.teams = list(Team.objects.filter(
-            teammembership__team__tournament=tournament).distinct())
+        self.teams = list(tournament.teams.all())
 
     def generate(self) -> List[Match]:
         if self.tournament.bracket_type == BracketType.SINGLE_ELIM:

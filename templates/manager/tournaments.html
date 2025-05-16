@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% block title %}Турниры{% endblock %}
 {% block content %}
 <h2>Турниры</h2>
@@ -11,7 +12,7 @@
       <td>{{ tourney.title }}</td>
       <td>{{ tourney.get_bracket_type_display }}</td>
       <td>
-        {% if tourney.registration_open %}
+        {% if tourney.status == "REGISTRATION" %}
           <button class="btn btn-sm btn-outline-primary"
                   data-toggle="modal"
                   data-target="#regModal{{ tourney.id }}">

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}Мои турниры{% endblock %}
+{% block content %}
+<h2 class="mb-3">Мои турниры</h2>
+<a href="{% url 'mod_tourney_create' %}" class="btn btn-success mb-3">Создать турнир</a>
+
+{% if tournaments %}
+  <table class="table table-striped">
+    <thead><tr><th>Название</th><th>Игра</th><th>Сетка</th><th>Регистрация</th><th></th></tr></thead>
+    <tbody>
+      {% for t in tournaments %}
+        <tr>
+          <td><a href="{% url 'mod_tour_detail' t.id %}">{{ t.title }}</a></td>
+          <td>{{ t.game.title }}</td>
+          <td>{{ t.get_bracket_type_display }}</td>
+          <td>
+            {% if t.status == "REGISTRATION" %}<span class="badge bg-success">Открыта</span>
+            {% else %}<span class="badge bg-danger">Закрыта</span>{% endif %}
+          </td>
+          <td><a href="{% url 'mod_tourney_edit' t.id %}" class="btn btn-sm btn-outline-primary">Редакт.</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>Пока нет турниров.</p>
+{% endif %}
+{% endblock %}

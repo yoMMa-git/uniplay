@@ -173,4 +173,17 @@ cython_debug/
 .pypirc
 
 # Static files
+static/
 staticfiles/
+
+# Migrations
+migrations/
+
+# Locales
+locale/
+
+# Mediafiles
+media/
+
+# Graphviz models
+*.dot

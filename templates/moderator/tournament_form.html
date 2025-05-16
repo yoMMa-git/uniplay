@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% if create %}Создать{% else %}Редактировать{% endif %} турнир{% endblock %}
+{% block content %}
+<h2 class="mb-3">{% if create %}Новый турнир{% else %}Редактировать турнир{% endif %}</h2>
+
+<form method="post">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary">{% if create %}Создать{% else %}Сохранить{% endif %}</button>
+  <a href="{% url 'mod_tournaments' %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

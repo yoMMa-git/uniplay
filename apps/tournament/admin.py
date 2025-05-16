@@ -1,11 +1,9 @@
 from django.contrib import admin, messages
-from .models import (
-    Game, Tournament, Team, TeamMembership,
-    Match
-)
-from .services.brackets import BracketFactory
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+
+from .models import Game, Match, Team, TeamMembership, Tournament
+from .services.brackets import BracketFactory
 
 User = get_user_model()
 
@@ -25,8 +23,9 @@ class UserAdmin(DjangoUserAdmin):
 
 @admin.register(Game)
 class GameAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "max_team_size")
+    list_display = ("id", "title", "team_size")
     search_fields = ("title",)
+
 
 # ---------- Team ---------- #
 
@@ -44,6 +43,7 @@ class TeamAdmin(admin.ModelAdmin):
     autocomplete_fields = ("manager",)
     inlines = (TeamMembershipInline,)
 
+
 # ---------- Tournament ---------- #
 
 
@@ -57,11 +57,8 @@ class MatchInline(admin.TabularInline):
 
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
-    list_display = (
-        "id", "title", "game", "bracket_type",
-        "registration_open"
-    )
-    list_filter = ("game", "bracket_type", "registration_open")
+    list_display = ("id", "title", "game", "description", "bracket_type", "status")
+    list_filter = ("game", "bracket_type", "status")
     search_fields = ("title",)
     filter_horizontal = ("moderators", "referees")
     inlines = (MatchInline,)
@@ -73,14 +70,10 @@ class TournamentAdmin(admin.ModelAdmin):
         for tournament in queryset:
             if Match.objects.filter(tournament=tournament).exists():
                 self.message_user(
-                    request,
-                    f"Сетка уже создана для «{tournament}»",
-                    messages.WARNING
+                    request, f"Сетка уже создана для «{tournament}»", messages.WARNING
                 )
                 continue
             BracketFactory(tournament).generate()
             self.message_user(
-                request,
-                f"Сетка сформирована для «{tournament}»",
-                messages.SUCCESS
+                request, f"Сетка сформирована для «{tournament}»", messages.SUCCESS
             )

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}Матч {{ match.team_a }} vs {{ match.team_b }}{% endblock %}
+{% block content %}
+<h2>{{ match.tournament.title }} – Раунд {{ match.round }}</h2>
+
+<table class="table table-bordered w-auto">
+  <tr>
+    <th>Команда A</th><th>Счёт A</th><th>Команда B</th><th>Счёт B</th>
+  </tr>
+  <tr>
+    <td>
+      <strong>{{ match.team_a }}</strong>
+      <ul class="small mb-0">
+        {% for p in match.team_a.members.all %}<li>{{ p.username }}</li>{% endfor %}
+      </ul>
+    </td>
+    <td class="text-center">{{ match.score_a }}</td>
+    <td>
+      <strong>{{ match.team_b }}</strong>
+      <ul class="small mb-0">
+        {% for p in match.team_b.members.all %}<li>{{ p.username }}</li>{% endfor %}
+      </ul>
+    </td>
+    <td class="text-center">{{ match.score_b }}</td>
+  </tr>
+</table>
+
+{% if disputes %}
+  <h4 class="mt-4">Споры ({{ disputes.count }})</h4>
+  {% for d in disputes %}
+    <div class="card mb-3">
+      <div class="card-header">
+        От {{ d.raised_by.username }} {% if d.resolved %}<span class="badge bg-success">решён</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <p class="card-text">{{ d.description }}</p>
+        {% if d.attachments.all %}
+          <p class="mb-1"><strong>Файлы:</strong></p>
+          <ul class="small">
+            {% for a in d.attachments.all %}
+              <li><a href="{{ a.file.url }}" target="_blank">{{ a.file.name|basename }}</a></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if d.resolved %}
+          <p class="small text-muted">Решил: {{ d.resolved_by }} - {{ d.resolution_notes }}</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<a href="javascript:history.back()" class="btn btn-link">← Назад</a>
+{% endblock %}

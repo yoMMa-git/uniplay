@@ -1,6 +1,25 @@
 from django import forms
-from .models import Team
-from apps.core.models import User, Role
+from django.utils.translation import gettext_lazy as _
+
+from apps.core.models import Role, User
+
+from .models import Team, Tournament
+
+
+class TournamentForm(forms.ModelForm):
+    class Meta:
+        model = Tournament
+        fields = ("title", "game", "bracket_type", "description", "status")
+
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control"}),
+            "game": forms.Select(attrs={"class": "form-select"}),
+            "bracket_type": forms.Select(attrs={"class": "form-select"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "status": forms.Select(
+                attrs={"class": "form-select"}
+            ),  # TODO: verify correct work
+        }
 
 
 class TeamCreateForm(forms.ModelForm):
@@ -12,7 +31,7 @@ class TeamCreateForm(forms.ModelForm):
         queryset=User.objects.filter(role=Role.PLAYER),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
         required=False,
-        label="Игроки"
+        label=_("Игроки"),
     )
 
     def save(self, commit=True, manager=None):

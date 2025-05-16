@@ -1,15 +1,46 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% block title %}Вход{% endblock %}
-{% block content %}
-<h2>Вход</h2>
-{% if err %}<div class="alert alert-danger">{{ err }}</div>{% endif %}
-<form method="post">{% csrf_token %}
-  <div class="mb-3"><input name="username" class="form-control" placeholder="Логин" /></div>
-  <div class="mb-3"><input name="password" type="password" class="form-control" placeholder="Пароль" /></div>
-  <button class="btn btn-primary">Войти</button>
-</form>
 
-<a class="btn btn-outline-secondary w-100" href="{% url 'register' %}">
-  Зарегистрироваться
-</a>
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+  <form method="post" class="w-100" style="max-width: 320px;">
+    <h2 class="text-center mb-4">Вход</h2>
+    {% if err %}
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ err }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    {% endif %}
+
+    {% csrf_token %}
+    <div class="form-group mb-2">
+      <input
+        name="username"
+        class="form-control form-control-sm"
+        placeholder="Логин"
+      />
+    </div>
+    <div class="form-group mb-3">
+      <input
+        name="password"
+        type="password"
+        class="form-control form-control-sm"
+        placeholder="Пароль"
+      />
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-sm w-100 mb-2">
+      Войти
+    </button>
+    <a
+      href="{% url 'register' %}"
+      class="btn btn-outline-secondary btn-sm w-100"
+    >
+      Зарегистрироваться
+    </a>
+  </form>
+</div>
 {% endblock %}

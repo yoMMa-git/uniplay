@@ -1,30 +1,54 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
+{% load i18n %}
 {% block title %}Регистрация{% endblock %}
+
 {% block content %}
-<h2>Регистрация</h2>
-<form method="post" class="needs-validation">{% csrf_token %}
-  {{ form.non_field_errors }}
-  <div class="mb-3">
-    {{ form.username.label_tag }} {{ form.username }}
-    {{ form.username.errors }}
-  </div>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+  <form method="post" class="w-100" style="max-width: 320px;">
+    <h2 class="text-center mb-4">Регистрация</h2>
 
-  <div class="mb-3">
-    {{ form.password1.label_tag }} {{ form.password1 }}
-    {{ form.password1.errors }}
-  </div>
-  <div class="mb-3">
-    {{ form.password2.label_tag }} {{ form.password2 }}
-    {{ form.password2.errors }}
-  </div>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ form.non_field_errors }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Закрыть">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    {% endif %}
 
-  <div class="mb-4">
-    {{ form.role.label_tag }} {{ form.role }}
-    {{ form.role.errors }}
-  </div>
+    <div class="form-group mb-2">
+      {{ form.username.label_tag }}
+      {{ form.username|add_class:"form-control form-control-sm" }}
+      {{ form.username.errors }}
+    </div>
 
-  <button class="btn btn-success w-100">Создать учётную запись</button>
-</form>
+    <div class="form-group mb-2">
+      {{ form.password1.label_tag }}
+      {{ form.password1|add_class:"form-control form-control-sm" }}
+      {{ form.password1.errors }}
+    </div>
 
-<a class="d-block mt-3" href="{% url 'login' %}">Уже есть аккаунт? Войти</a>
+    <div class="form-group mb-2">
+      {{ form.password2.label_tag }}
+      {{ form.password2|add_class:"form-control form-control-sm" }}
+      {{ form.password2.errors }}
+    </div>
+
+    <div class="form-group mb-4">
+      {{ form.role.label_tag }}
+      {{ form.role|add_class:"form-control form-control-sm" }}
+      {{ form.role.errors }}
+    </div>
+
+    <button type="submit" class="btn btn-success btn-sm w-100 mb-2">
+      Создать учётную запись
+    </button>
+    <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-sm w-100">
+      Уже есть аккаунт? Войти
+    </a>
+  </form>
+</div>
 {% endblock %}

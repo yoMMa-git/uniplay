@@ -1,6 +1,8 @@
+{% load static %}
+{% load widget_tweaks %}
+{% load i18n %}
 <!doctype html>
 <html lang="ru">
-{% load static %} 
 <head>
   <meta charset="utf-8" />
   <title>{% block title %}UniPlay{% endblock %}</title>
@@ -15,6 +17,8 @@
       <a class="nav-link text-white" href="{% url 'manager_teams' %}">Команды</a>
       <a class="nav-link text-white" href="{% url 'manager_matches' %}">Матчи</a>
       <a class="nav-link text-white" href="{% url 'profile' %}">Личный кабинет</a>
+    {% elif user.role == 'moderator' %}
+      <a class="nav-link text-white" href="{% url 'mod_tournaments' %}">Турниры</a>
     {% elif user.role == 'referee' %}
     <!---->
     {% elif user.role == 'player' %}
@@ -22,16 +26,37 @@
     {% elif user.role == 'admin' %}
       <a class="nav-link text-white" href="/admin/">Django Admin</a>
     {% endif %}
+
+    {# ————— форма переключения языка ————— #}
+    <form action="{% url 'set_language' %}" method="post"
+          class="d-inline-block ms-3 me-auto">
+      {% csrf_token %}
+      {% get_current_language as LANGUAGE_CODE %}
+      {% get_available_languages as LANGUAGES %}
+      <select name="language"
+              class="form-select form-select-sm bg-dark text-white border-0 language-select"
+              onchange="this.form.submit()">
+        {% for code, name in LANGUAGES %}
+          <option value="{{ code }}"
+                  {% if code == LANGUAGE_CODE %}selected{% endif %}>
+            {{ name }}
+          </option>
+        {% endfor %}
+      </select>
+    </form>
+    {# ———————————————————————————— #}
+
     <span class="navbar-text ml-auto mr-3 text-white">Вы: {{ user.username }}</span>
     <a class="btn btn-outline-light" href="{% url 'logout' %}">Выйти</a>
   {% endif %}
+
 </nav>
 {% if messages %}
   <div class="container mt-3">
     {% for m in messages %}
-      <div class="alert alert-{{ m.tags }} alert-dismissible fade show" role="alert">
+      <div class="alert alert-{{ m.tags }} alert-dismissible fade show" role="alert" id="message_box">
         {{ m }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="close" data-bs-dismiss="alert"></button>
       </div>
     {% endfor %}
   </div>
@@ -40,5 +65,12 @@
 <!-- <script src="{% static 'htmx.min.js' %}"></script> -->
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.slim.min.js"></script>
 <script src="{% static 'bootstrap.bundle.min.js' %}"></script>
+<script>
+  var message_tag = document.getElementById("message_box");
+
+  setTimeout(function(){
+    message_tag.style.display = "none";
+  }, 3000);
+</script>
 </body>
 </html>

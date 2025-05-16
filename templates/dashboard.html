@@ -1,77 +1,82 @@
 {% extends "base.html" %}
-{% block title %}Личный кабинет{% endblock %}
+{% load i18n %}
+{% block title %}Дашборд{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Личный кабинет</h2>
+<div class="container py-4">
+  <div class="row g-4">
+    <!-- Левая колонка: все турниры -->
+    <div class="col-md-8">
+      <div class="bg-white rounded border border-dark p-3 h-100">
+        <h3 class="mb-3">Все турниры</h3>
+        {% if tournaments %}
+          <ul class="list-group">
+            {% for t in tournaments %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <a href="{% url 'mod_tour_detail' t.id %}">{{ t.title }}</a>
+                <span class="badge badge-secondary">{{ t.get_bracket_type_display }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>Пока нет турниров.</p>
+        {% endif %}
+      </div>
+    </div>
 
-{% if user.role == 'admin' %}
-  <h4>Статистика системы</h4>
-  <ul>
-    <li>Пользователей: <strong>{{ user_count }}</strong></li>
-    <li>Турниров: <strong>{{ tournament_count }}</strong></li>
-  </ul>
-  <a href="/admin/" class="btn btn-secondary">Django Admin</a>
+    <!-- Правая колонка: контекстно-ролевой блок -->
+    <div class="col-md-4">
+      <div class="bg-white rounded border border-dark p-3 h-100">
+        <h4 class="mb-3">{{ panel.title }}</h4>
 
-{% elif user.role == 'moderator' %}
-  <h4>Турниры, где вы модератор</h4>
-  {% if my_tournaments %}
-    <ul class="list-group">
-      {% for t in my_tournaments %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          {{ t.title }}
-          <span class="badge bg-secondary">{{ t.get_bracket_type_display }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Пока нет турниров.</p>
-  {% endif %}
+        {% if user.role == 'player' %}
+          {% if panel.items %}
+            <ul class="list-group">
+              {% for m in panel.items %}
+                <li class="list-group-item">
+                  {{ m.tournament.title }}: {{ m.team_a }} vs {{ m.team_b }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>Нет предстоящих матчей.</p>
+          {% endif %}
 
-{% elif user.role == 'referee' %}
-  <h4>Назначенные матчи</h4>
-  {% if my_matches %}
-    <ul class="list-group mb-3">
-      {% for m in my_matches %}
-        <li class="list-group-item">{{ m.tournament }} — {{ m.team_a }} vs {{ m.team_b }}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Матчи не назначены.</p>
-  {% endif %}
-  <h5>Открытые споры</h5>
-  {% if open_disputes %}
-    <ul class="list-group">
-      {% for d in open_disputes %}
-        <li class="list-group-item">{{ d.match }}: {{ d.description|truncatechars:40 }}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Споров нет.</p>
-  {% endif %}
+        {% elif user.role in 'referee moderator' %}
+          {% if panel.items %}
+            <ul class="list-group">
+              {% for t in panel.items %}
+                <li class="list-group-item">
+                  <a href="{% url 'mod_tour_detail' t.id %}">{{ t.title }}</a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>Нет доступных турниров.</p>
+          {% endif %}
 
-{% elif user.role == 'manager' %}
-  <a class="btn btn-success mb-3" href="{% url 'team_create' %}">Добавить команду</a>
-  <h4>Ваши команды</h4>
-  {% if my_teams %}
-    <ul class="list-group">
-      {% for team in my_teams %}
-        <li class="list-group-item">{{ team.name }} — игроков: {{ team.members.count }}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Команды ещё не созданы.</p>
-  {% endif %}
+        {% elif user.role == 'manager' %}
+          {% if panel.items %}
+            <ul class="list-group">
+              {% for team in panel.items %}
+                <li class="list-group-item">
+                  {{ team.name }} ({{ team.members.count }} игроков)
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>У вас нет команд.</p>
+          {% endif %}
 
-{% else %}
-  <h4>Ваши матчи</h4>
-  {% if my_matches %}
-    <ul class="list-group">
-      {% for m in my_matches %}
-        <li class="list-group-item">{{ m.tournament }} — {{ m.team_a }} vs {{ m.team_b }}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Вы пока не участвуете в матчах.</p>
-  {% endif %}
-{% endif %}
+        {% else %}
+          <ul class="list-group">
+            <li class="list-group-item">Пользователей: {{ panel.items.users }}</li>
+            <li class="list-group-item">Турниров: {{ panel.items.tours }}</li>
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
 {% endblock %}

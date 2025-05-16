@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from apps.core.models import User, Role
+
+from apps.core.models import Role, User
 
 
 class CustomRegistration(UserCreationForm):
@@ -13,7 +14,7 @@ class CustomRegistration(UserCreationForm):
         label="Роль",
         choices=ALLOWED_ROLES,
         initial=Role.PLAYER,
-        widget=forms.Select(attrs={"class": "form-select"})
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     class Meta(UserCreationForm.Meta):
@@ -27,7 +28,7 @@ class ProfileForm(forms.ModelForm):
         fields = ("first_name", "last_name", "email", "avatar", "phone")
         widgets = {
             "first_name": forms.TextInput(attrs={"class": "form-control"}),
-            "last_name":  forms.TextInput(attrs={"class": "form-control"}),
-            "email":      forms.EmailInput(attrs={"class": "form-control"}),
-            "phone":      forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "phone": forms.TextInput(attrs={"class": "form-control"}),
         }

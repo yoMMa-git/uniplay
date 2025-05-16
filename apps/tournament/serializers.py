@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Game, Team, TeamMembership, Tournament, Match
+
+from .models import Game, Match, Team, TeamMembership, Tournament
 
 
 class GameSerializer(serializers.ModelSerializer):
@@ -9,8 +10,7 @@ class GameSerializer(serializers.ModelSerializer):
 
 
 class TeamMembershipSerializer(serializers.ModelSerializer):
-    player_username = serializers.CharField(
-        source="user.username", read_only=True)
+    player_username = serializers.CharField(source="user.username", read_only=True)
 
     class Meta:
         model = TeamMembership
@@ -19,7 +19,8 @@ class TeamMembershipSerializer(serializers.ModelSerializer):
 
 class TeamSerializer(serializers.ModelSerializer):
     members = TeamMembershipSerializer(
-        source="teammembership_set", many=True, read_only=True)
+        source="teammembership_set", many=True, read_only=True
+    )
 
     class Meta:
         model = Team
