@@ -27,14 +27,13 @@
       <a class="nav-link text-white" href="/admin/">Django Admin</a>
     {% endif %}
 
-    {# ————— форма переключения языка ————— #}
     <form action="{% url 'set_language' %}" method="post"
-          class="d-inline-block ms-3 me-auto">
+          class="d-inline-block ml-auto mr-3">
       {% csrf_token %}
       {% get_current_language as LANGUAGE_CODE %}
       {% get_available_languages as LANGUAGES %}
       <select name="language"
-              class="form-select form-select-sm bg-dark text-white border-0 language-select"
+              class="form-select form-select-sm bg-dark text-white border-0 language-select text-right mr-3"
               onchange="this.form.submit()">
         {% for code, name in LANGUAGES %}
           <option value="{{ code }}"
@@ -44,9 +43,8 @@
         {% endfor %}
       </select>
     </form>
-    {# ———————————————————————————— #}
 
-    <span class="navbar-text ml-auto mr-3 text-white">Вы: {{ user.username }}</span>
+    <span class="navbar-text mr-3 text-white">Вы: {{ user.username }}</span>
     <a class="btn btn-outline-light" href="{% url 'logout' %}">Выйти</a>
   {% endif %}
 

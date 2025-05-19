@@ -29,9 +29,9 @@ from apps.tournament.views_site import (
     logout_view,
     manager_matches,
     match_detail,
-    mod_tournament_create,
-    mod_tournament_detail,
-    mod_tournament_edit,
+    # mod_tournament_create,
+    # mod_tournament_detail,
+    # mod_tournament_edit,
     mod_tournament_generate,
     mod_tournament_start,
     mod_tournaments,
@@ -39,6 +39,7 @@ from apps.tournament.views_site import (
     profile_view,
     register_team,
     register_view,
+    tournament_detail,
     tournaments_for_manager,
 )
 
@@ -55,6 +56,14 @@ urlpatterns = [
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 """
+Moderator pages
+"""
+
+urlpatterns += [
+    path("moderator/tournaments", mod_tournaments, name="mod_tournaments"),
+]
+
+"""
 Manager pages
 """
 urlpatterns += [
@@ -69,38 +78,22 @@ urlpatterns += [
 ]
 
 """
-Moderator pages
+Match pages
 """
+
 urlpatterns += [
-    path("moderator/tournaments/", mod_tournaments, name="mod_tournaments"),
-    path(
-        "moderator/tournaments/create", mod_tournament_create, name="mod_tourney_create"
-    ),
-    path(
-        "moderator/tournaments/<int:pk>/edit/",
-        mod_tournament_edit,
-        name="mod_tourney_edit",
-    ),
-    path(
-        "moderator/tournaments/<int:pk>/", mod_tournament_detail, name="mod_tour_detail"
-    ),
-    path(
-        "moderator/tournaments/<int:pk>/generate/",
-        mod_tournament_generate,
-        name="mod_tour_generate",
-    ),
-    path(
-        "moderator/tournaments/<int:pk>/start/",
-        mod_tournament_start,
-        name="mod_tour_start",
-    ),
+    path("match/<int:pk>/", match_detail, name="match_detail"),
 ]
 
 """
-Match pages
+Tournament pages
 """
 urlpatterns += [
-    path("match/<int:pk>/", match_detail, name="match_detail"),
+    path("tournaments/<int:pk>/", tournament_detail, name="tour_detail"),
+    path(
+        "tournaments/<int:pk>/generate/", mod_tournament_generate, name="tour_generate"
+    ),
+    path("tournaments/<int:pk>/start/", mod_tournament_start, name="tour_start"),
 ]
 
 """

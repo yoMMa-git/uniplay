@@ -11,29 +11,27 @@ from apps.tournament.forms import TeamCreateForm, TournamentForm
 from apps.tournament.services.brackets import BracketFactory
 from apps.tournament.utils import manager_required, moderator_required
 
-from .models import Match, Team, Tournament, TourneyStatus
+from .models import Match, Team, Tournament, TourneyStatus, User
 
 API = "/api"
 
 """
-AUTHENTICATION AND MAIN PAGES
+АУТЕНТИФИКАЦИЯ И РЕГИСТРАЦИЯ
 """
 
 
 def login_view(request):
-    if request.user.is_authenticated:  # если уже залогинен
+    if request.user.is_authenticated:
         return redirect("dashboard")
     if request.method == "POST":
         user = authenticate(
             request,
             username=request.POST["username"],
             password=request.POST["password"],
-        )  # возврат None, если неверные данные
+        )
         if user:
-            # сохранение пользователя для последующих запросов
             login(request, user)
             return redirect("dashboard")
-        # показывает alert-danger
         return render(request, "login.html", {"err": "Неверный логин/пароль"})
     return render(request, "login.html")
 
@@ -48,16 +46,14 @@ def logout_view(request):
 def dashboard(request):
     user = request.user
 
-    # 1) Список всех турниров
     tournaments = Tournament.objects.all().order_by("-id")
 
-    # 2) Ролевой контент
     panel = {}
     if user.role == Role.PLAYER:
         # игры, в которых участвует пользователь
         matches = Match.objects.filter(
             Q(team_a__members=user) | Q(team_b__members=user),
-            tournament__status=Tournament.TourStatus.ONGOING,
+            tournament__status=TourneyStatus.ONGOING,
         ).select_related("tournament", "team_a", "team_b")
         panel["title"] = "Предстоящие матчи"
         panel["items"] = matches
@@ -82,7 +78,7 @@ def dashboard(request):
     else:  # ADMIN
         panel["title"] = "Системная статистика"
         panel["items"] = {
-            "users": request._db.User.objects.count(),
+            "users": User.objects.count(),
             "tours": Tournament.objects.count(),
         }
 
@@ -94,33 +90,6 @@ def dashboard(request):
             "panel": panel,
         },
     )
-
-    # # через internal DRF‑view, поэтому можем просто вызвать ORM;
-    # user = request.user
-    # ctx = {}
-
-    # if user.role == Role.ADMIN:
-    #     ctx.update({
-    #         "user_count": User.objects.count(),
-    #         "tournament_count": Tournament.objects.count(),
-    #     })
-    # elif user.role == Role.MODERATOR:
-    #     ctx["my_tournaments"] = Tournament.objects.filter(moderators=user)
-    # elif user.role == Role.REFEREE:
-    #     ctx["my_matches"] = Match.objects.filter(tournament__referees=user)
-    #     # TODO: disputes (resolved = False)
-    # elif user.role == Role.MANAGER:
-    #     ctx["my_teams"] = Team.objects.filter(
-    #         manager=user).prefetch_related("members")
-    # else:
-    #     ctx["my_matches"] = Match.objects.filter(
-    #         team_a__members=user
-    #     ) | Match.objects.filter(
-    #         team_b__members=user
-    #     )
-
-    # # TODO: на dashboard закинуть список всех турниров, справа сделать скроллящиеся панели, в зависимости от роли
-    # return render(request, "dashboard.html", ctx)
 
 
 @login_required
@@ -147,11 +116,6 @@ def profile_view(request):
             f.widget.attrs["disabled"] = True
 
     return render(request, "profile.html", {"form": form, "edit_mode": edit_mode})
-
-
-"""
-РЕГИСТРАЦИЯ
-"""
 
 
 def register_view(request):
@@ -212,9 +176,7 @@ def create_team(request):
 @manager_required
 @require_POST
 def register_team(request, tournament_id):
-    tournament = get_object_or_404(
-        Tournament, id=tournament_id, status=TourneyStatus.REGISTRATION
-    )
+    tournament = get_object_or_404(Tournament, id=tournament_id)
     team_id = request.POST.get("team_id")
 
     team = get_object_or_404(Team, id=team_id, manager=request.user)
@@ -235,7 +197,7 @@ def register_team(request, tournament_id):
                 )
         else:
             messages.error(request, "Регистрация на данный турнир уже окончена!")
-    return redirect("manager_tournaments")
+    return redirect("dashboard")
 
 
 @login_required
@@ -292,23 +254,31 @@ def mod_tournament_edit(request, pk):
     )
 
 
-@login_required
-@moderator_required
-def mod_tournament_detail(request, pk):
-    tourney = get_object_or_404(Tournament, pk=pk, moderators=request.user)
-    teams = tourney.teams.prefetch_related("members")
-    matches = Match.objects.filter(tournament=tourney).select_related(
-        "team_a", "team_b"
-    )
-    return render(
-        request,
-        "moderator/tournament_detail.html",
-        {
-            "tour": tourney,
-            "teams": teams,
-            "matches": matches,
-        },
-    )
+# @login_required
+# @moderator_required
+# def tournament_detail(request, pk):
+#     """
+#     Universal tournament detail view with role-based access control
+#     """
+#     if request.user.role == Role.MODERATOR:
+#         tourney = get_object_or_404(Tournament, pk=pk, moderators=request.user)
+#     else:
+#         tourney = get_object_or_404(Tournament, pk=pk)
+
+#     teams = tourney.teams.prefetch_related("members")
+#     matches = Match.objects.filter(tournament=tourney).select_related(
+#         "team_a", "team_b"
+#     )
+
+#     return render(
+#         request,
+#         "tournament/tournament_detail.html",
+#         {
+#             "tour": tourney,
+#             "teams": teams,
+#             "matches": matches,
+#         },
+#     )
 
 
 @login_required
@@ -321,7 +291,7 @@ def mod_tournament_generate(request, pk):
 
     BracketFactory(tourney).generate()
     messages.success(request, "Сетка успешно сгенерирована!")
-    return redirect("mod_tour_detail", pk=pk)
+    return redirect("tour_detail", pk=pk)
 
 
 @login_required
@@ -332,7 +302,7 @@ def mod_tournament_start(request, pk):
 
     if not Match.objects.filter(tournament=tourney).exists():
         messages.error(request, "Не была сгенерирована сетка!")
-        return redirect("mod_tour_detail", pk=pk)
+        return redirect("tour_detail", pk=pk)
 
     tourney.status = TourneyStatus.ONGOING
     tourney.save()
@@ -341,7 +311,12 @@ def mod_tournament_start(request, pk):
     #     Room.objects.create(match=match)
 
     messages.success(request, "Турнир успешно стартовал!")
-    return redirect("mod_tour_detail", pk=pk)
+    return redirect("tour_detail", pk=pk)
+
+
+"""
+MATCHES
+"""
 
 
 @login_required
@@ -364,5 +339,34 @@ def match_detail(request, pk):
         {
             "match": match,
             # "disputes": disputes,
+        },
+    )
+
+
+"""
+TOURNAMENTS
+"""
+
+
+@login_required
+def tournament_detail(request, pk):
+    """
+    Universal tournament detail view with role-based access control
+    """
+
+    tourney = get_object_or_404(Tournament, pk=pk)
+
+    teams = tourney.teams.prefetch_related("members")
+    matches = Match.objects.filter(tournament=tourney).select_related(
+        "team_a", "team_b"
+    )
+
+    return render(
+        request,
+        "tournament/tournament_detail.html",
+        {
+            "tour": tourney,
+            "teams": teams,
+            "matches": matches,
         },
     )

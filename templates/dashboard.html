@@ -7,17 +7,37 @@
   <div class="row g-4">
     <!-- Левая колонка: все турниры -->
     <div class="col-md-8">
-      <div class="bg-white rounded border border-dark p-3 h-100">
+      <div class="bg-white rounded border border-dark p-3 h-100" id="mainDashboard">
         <h3 class="mb-3">Все турниры</h3>
         {% if tournaments %}
-          <ul class="list-group">
-            {% for t in tournaments %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <a href="{% url 'mod_tour_detail' t.id %}">{{ t.title }}</a>
-                <span class="badge badge-secondary">{{ t.get_bracket_type_display }}</span>
-              </li>
-            {% endfor %}
-          </ul>
+          <table class="table" id="tournamentList">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Игра</th>
+                <th>Тип сетки</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tournaments %}
+                {% if user.role not in 'player manager' or t.status != 'draft' %}
+                  <tr>
+                    <td><a href="{% url 'tour_detail' t.id %}">{{ t.title }}</a></td>
+                    <td>{{ t.game.title }}</td>
+                    <td>{{ t.get_bracket_type_display }}</td>
+                    <td>
+                      {% with badge_class=t.status|yesno:'secondary,primary,success,dark,danger' %}
+                        <span class="badge badge-{{ badge_class }}">
+                          {{ t.get_status_display|default:"ERROR" }}
+                        </span>
+                      {% endwith %}
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
         {% else %}
           <p>Пока нет турниров.</p>
         {% endif %}
@@ -46,8 +66,13 @@
           {% if panel.items %}
             <ul class="list-group">
               {% for t in panel.items %}
-                <li class="list-group-item">
-                  <a href="{% url 'mod_tour_detail' t.id %}">{{ t.title }}</a>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <a href="{% url 'tour_detail' t.id %}">{{ t.title }}</a>
+                  {% with badge_class=t.status|yesno:'secondary,primary,success,dark,danger' %}
+                    <span class="badge badge-{{ badge_class }}">
+                      {{ t.get_status_display|default:"ERROR" }}
+                    </span>
+                  {% endwith %}
                 </li>
               {% endfor %}
             </ul>
@@ -79,4 +104,11 @@
 
   </div>
 </div>
+<script>
+  var row_no = document.getElementById("tournamentList").rows.length - 1;
+  if (row_no < 1) {
+    document.getElementById("tournamentList").style.display = "none";
+    document.getElementById("mainDashboard").append("Пока нет турниров.");
+  }
+</script>
 {% endblock %}

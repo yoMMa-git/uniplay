@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{{ tour.title }}{% endblock %}
+{% block content %}
+<h2>{{ tour.title }}</h2>
+<p>
+  <strong>Игра:</strong> {{ tour.game.title }} <br>
+  <strong>Сетка:</strong> {{ tour.get_bracket_type_display }} <br>
+  <strong>Регистрация:</strong>
+  {% if tour.status == "registration" %}открыта{% else %}закрыта{% endif %} <br>
+  <strong>Статус:</strong> {{ tour.get_status_display }}
+</p>
+
+<h4>Команды ({{ teams.count }})</h4>
+<ul>
+  {% for team in teams %}
+    <li>{{ team.name }} — {{ team.members.count }} игроков
+      <ul class="small">
+        {% for p in team.members.all %}<li>{{ p.username }}</li>{% endfor %}
+      </ul>
+    </li>
+  {% endfor %}
+</ul>
+
+{% if user in tour.moderators.all and tour.status == 'registration' %}
+  <form method="post" action="{% url 'tour_generate' tour.id %}" class="d-inline">
+    {% csrf_token %}
+    <button class="btn btn-outline-primary">Сгенерировать сетку</button>
+  </form>
+
+  {% if matches %}
+    <form method="post" action="{% url 'tour_start' tour.id %}" class="d-inline">
+      {% csrf_token %}
+      <button class="btn btn-success">Запустить турнир</button>
+    </form>
+  {% endif %}
+{% endif %}
+
+{% if matches %}
+  <h4 class="mt-4">Матчи ({{ matches.count }})</h4>
+  <table class="table table-sm">
+    <thead><tr><th>Раунд</th><th>Матч</th></tr></thead>
+    <tbody>
+      {% for m in matches %}
+        <tr>
+          <td>{{ m.round }}</td>
+          <td>
+            <a href="{% url 'match_detail' m.id %}">
+              {{ m.team_a }} vs {{ m.team_b }}
+            </a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
+
+<a href="{% url 'dashboard' %}" class="btn btn-link">← на главную</a>
+
+
+{% endblock %}
