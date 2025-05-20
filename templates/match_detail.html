@@ -2,7 +2,7 @@
 {% load i18n %}
 {% block title %}Матч {{ match.team_a }} vs {{ match.team_b }}{% endblock %}
 {% block content %}
-<h2>{{ match.tournament.title }} – Раунд {{ match.round }}</h2>
+<h2>{{ match.tournament.title }} - Раунд {{ match.round }}</h2>
 
 <table class="table table-bordered w-auto">
   <tr>
@@ -39,7 +39,7 @@
           <p class="mb-1"><strong>Файлы:</strong></p>
           <ul class="small">
             {% for a in d.attachments.all %}
-              <li><a href="{{ a.file.url }}" target="_blank">{{ a.file.name|basename }}</a></li>
+              <li><a href="{{ a.file.url }}" target="_blank">{{ a.file.name }}</a></li>
             {% endfor %}
           </ul>
         {% endif %}
