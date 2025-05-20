@@ -27,11 +27,23 @@
                     <td>{{ t.game.title }}</td>
                     <td>{{ t.get_bracket_type_display }}</td>
                     <td>
-                      {% with badge_class=t.status|yesno:'secondary,primary,success,dark,danger' %}
-                        <span class="badge badge-{{ badge_class }}">
+                      {% if t.status == 'draft' %}
+                        <span class="badge badge-secondary">
                           {{ t.get_status_display|default:"ERROR" }}
                         </span>
-                      {% endwith %}
+                      {% elif t.status == 'registration' %}
+                        <span class="badge badge-warning">
+                          {{ t.get_status_display|default:"ERROR" }}
+                        </span>
+                      {% elif t.status == 'ongoing' %}
+                        <span class="badge badge-primary">
+                          {{ t.get_status_display|default:"ERROR" }}
+                        </span>
+                      {% elif t.status == 'finished' %}
+                        <span class="badge badge-success">
+                          {{ t.get_status_display|default:"ERROR" }}
+                        </span>
+                      {% endif %}
                     </td>
                   </tr>
                 {% endif %}
@@ -68,11 +80,23 @@
               {% for t in panel.items %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                   <a href="{% url 'tour_detail' t.id %}">{{ t.title }}</a>
-                  {% with badge_class=t.status|yesno:'secondary,primary,success,dark,danger' %}
-                    <span class="badge badge-{{ badge_class }}">
+                  {% if t.status == 'draft' %}
+                    <span class="badge badge-secondary">
                       {{ t.get_status_display|default:"ERROR" }}
                     </span>
-                  {% endwith %}
+                  {% elif t.status == 'registration' %}
+                    <span class="badge badge-warning">
+                      {{ t.get_status_display|default:"ERROR" }}
+                    </span>
+                  {% elif t.status == 'ongoing' %}
+                    <span class="badge badge-primary">
+                      {{ t.get_status_display|default:"ERROR" }}
+                    </span>
+                  {% elif t.status == 'finished' %}
+                    <span class="badge badge-success">
+                      {{ t.get_status_display|default:"ERROR" }}
+                    </span>
+                  {% endif %}
                 </li>
               {% endfor %}
             </ul>
