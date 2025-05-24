@@ -370,3 +370,11 @@ def tournament_detail(request, pk):
             "matches": matches,
         },
     )
+
+
+# def tournament_brackets_view(request, tournament_id):
+#     tournament = Tournament.objects.get(id=tournament_id)
+#     factory = BracketFactory(tournament)
+#     matches = factory.generate()
+#     brackets = factory.serialize_brackets(matches)
+#     return render(request, "tournament/brackets.html", {"tournament": tournament, "brackets": brackets})

@@ -11,6 +11,45 @@
   <strong>Статус:</strong> {{ tour.get_status_display }}
 </p>
 
+{% if user.role == 'manager' and tour.status == 'registration' %}
+  <button class="btn btn-primary mb-3" 
+          data-toggle="modal" 
+          data-target="#registerTeamModal">
+    Зарегистрировать команду
+  </button>
+
+  <!-- Modal -->
+  <div class="modal fade" id="registerTeamModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="post" action="{% url 'team_register' tour.id %}">
+          {% csrf_token %}
+          <div class="modal-header">
+            <h5 class="modal-title">Регистрация в турнире</h5>
+            <button type="button" class="close" data-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="teamSelect">Выберите команду</label>
+              <select name="team_id" id="teamSelect" class="form-select">
+                {% for team in user.teams_managed.all %}
+                  {% if team not in teams %}
+                    <option value="{{ team.id }}">{{ team.name }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-primary">Зарегистрировать</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
 <h4>Команды ({{ teams.count }})</h4>
 <ul>
   {% for team in teams %}

@@ -26,6 +26,37 @@
   </tr>
 </table>
 
+<!-- Add button to open modal -->
+<button type="button" class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#submitScoreModal">
+  Отправить счёт
+</button>
+
+<!-- Modal structure -->
+<div class="modal fade" id="submitScoreModal" tabindex="-1" aria-labelledby="submitScoreModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="submitScoreModalLabel">Отправить счёт</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="{% url 'submit_score' match.id %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="scoreA" class="form-label">Счёт команды A</label>
+            <input type="number" class="form-control" id="scoreA" name="score_a" required>
+          </div>
+          <div class="mb-3">
+            <label for="scoreB" class="form-label">Счёт команды B</label>
+            <input type="number" class="form-control" id="scoreB" name="score_b" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Отправить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if disputes %}
   <h4 class="mt-4">Споры ({{ disputes.count }})</h4>
   {% for d in disputes %}

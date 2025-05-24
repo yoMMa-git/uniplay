@@ -29,9 +29,9 @@ from apps.tournament.views_site import (
     logout_view,
     manager_matches,
     match_detail,
-    # mod_tournament_create,
+    mod_tournament_create,
     # mod_tournament_detail,
-    # mod_tournament_edit,
+    mod_tournament_edit,
     mod_tournament_generate,
     mod_tournament_start,
     mod_tournaments,
@@ -94,6 +94,8 @@ urlpatterns += [
         "tournaments/<int:pk>/generate/", mod_tournament_generate, name="tour_generate"
     ),
     path("tournaments/<int:pk>/start/", mod_tournament_start, name="tour_start"),
+    path("tournaments/<int:pk>/edit/", mod_tournament_edit, name="tour_edit"),
+    path("tournaments/create/", mod_tournament_create, name="tour_create"),
 ]
 
 """
