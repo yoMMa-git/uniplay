@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# сначала зависимости
+COPY frontend/package*.json ./
+RUN npm install
+
+# затем весь фронтенд-код
+COPY frontend/ ./
+
+# прокидываем адрес API
+ENV VITE_API_URL=http://localhost:8000/api
+
+EXPOSE 5173
+
+# запускаем vite-dev-server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

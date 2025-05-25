@@ -1,0 +1,49 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: uniplay
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: uniplaydb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app
+    ports:
+      - '8000:8000'
+    environment:
+      # соединение с БД
+      DB_HOST: db
+      DB_PORT: 5432
+      POSTGRES_USER: uniplay
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: uniplaydb
+      # по-примерам в settings.py
+      DEBUG: '1'
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    volumes:
+      - ./frontend:/app
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
