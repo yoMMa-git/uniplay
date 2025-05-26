@@ -54,7 +54,7 @@ class Tournament(models.Model):
     start_date = models.DateField(null=True)
     bracket_format = models.CharField(max_length=20, choices=FORMAT_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
-    teams = models.ManyToManyField(Team, related_name="tournaments")
+    teams = models.ManyToManyField(Team, related_name="tournaments", blank=True)
     moderators = models.ManyToManyField(
         User,
         related_name="moderated_tournaments",

@@ -14,7 +14,7 @@ import {
 
 interface Game { id: number; name: string; }
 interface Tournament { id: number; title: string; status: string; game: Game; start_date: string; }
-interface Profile { id: number; username: string; role: 'admin' | 'moderator' | 'referee' | 'player'; }
+interface Profile { id: number; username: string; role?: 'admin' | 'moderator' | 'referee' | 'player'; }
 
 export default function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -44,6 +44,8 @@ export default function Dashboard() {
     api.get('/auth/users/').then(res => setUserCount(res.data.length));
     api.get('/tournaments/').then(res => setTournamentCount(res.data.length));
   }, []);
+
+  const role = (profile?.role as Profile['role']) || 'player';
 
   useEffect(() => {
     if (!profile) return;
@@ -137,19 +139,26 @@ export default function Dashboard() {
         <Card>
           <CardContent>
             <h2 className="text-lg font-semibold">Welcome, {profile.username}!</h2>
-            <p className="mt-2 font-medium">Role: {profile.role}</p>
+            <p className="mt-2 font-medium">Role: {role}</p>
           </CardContent>
         </Card>
 
-        {profile.role === 'admin' && (
+        {role === 'admin' && (
           <>
             <Card>
               <CardContent>
                 <h3 className="text-lg font-semibold">Overview</h3>
                 <p>Total Users: {userCount}</p>
                 <p>Total Tournaments: {tournamentCount}</p>
-                <Button className="mt-2" onClick={() => window.location.href = '/admin'}>
-                  Admin Panel
+                <Button
+                  className="mt-2"
+                  onClick={() => {
+                    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                    const adminUrl = apiUrl.replace(/\/api$/, '') + '/admin/';
+                    window.location.href = adminUrl;
+                  }}
+                >
+                  Go to Admin
                 </Button>
               </CardContent>
             </Card>
@@ -174,7 +183,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {profile.role === 'moderator' && (
+        {role === 'moderator' && (
           <>
             <Card>
               <CardContent>
@@ -185,7 +194,7 @@ export default function Dashboard() {
             <Card>
               <CardContent>
                 <h3 className="text-lg font-semibold">Quick Actions</h3>
-                <Button onClick={() => window.location.href = '/tournaments'}>
+                <Button onClick={() => window.location.href = '/tournaments/create'}>
                   Create Tournament
                 </Button>
               </CardContent>
@@ -193,7 +202,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {profile.role === 'referee' && (
+        {role === 'referee' && (
           <>
             <Card>
               <CardContent>
@@ -210,7 +219,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {profile.role === 'player' && (
+        {role === 'player' && (
           <Card>
             <CardContent>
               <h3 className="text-lg font-semibold">Upcoming Matches</h3>

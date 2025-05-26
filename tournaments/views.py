@@ -50,6 +50,17 @@ class TournamentViewSet(viewsets.ModelViewSet):
         ]:
             return [IsAuthenticated(), IsModerator()]
         return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        qs = Tournament.objects.all()
+        user = self.request.user
+        if not (user.role in ['admin', 'moderator']):
+            qs = qs.exclude(status='draft')
+        return qs
+
+    def perform_create(self, serializer):
+        t = serializer.save()
+        t.moderators.add(self.request.user)
 
     @action(detail=True, methods=["post"])
     def generate_bracket(self, request, pk=None):

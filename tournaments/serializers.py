@@ -65,7 +65,6 @@ class TournamentCreateUpdateSerializer(serializers.ModelSerializer):
             "game",
             "prize_pool",
             "start_date",
-            "end_date",
             "bracket_format",
             "status",
             "teams",

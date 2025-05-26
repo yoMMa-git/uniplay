@@ -17,7 +17,7 @@ class TeamAdmin(admin.ModelAdmin):
 
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
-    list_display = ("title", "game", "status", "start_date")
+    list_display = ("id", "title", "game", "status", "start_date")
     list_filter = ("status", "game")
     filter_horizontal = ("teams", "moderators", "referees")
 
