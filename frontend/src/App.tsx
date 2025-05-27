@@ -5,13 +5,14 @@ import Dashboard from './pages/Dashboard';
 import GamesList from './pages/GamesList';
 import TeamsList from './pages/TeamsList';
 import TournamentCreate from './pages/TournamentCreate';
-import TournamentsList from './pages/TournamentsList';
+import TournamentsList from './pages/TournamentsTable';
 import TournamentDetail from './pages/TournamentDetail';
 import MatchDetail from './pages/MatchDetail';
 import NotFound from './pages/NotFound';
 import Navbar from './components/Navbar';
 import { ToastContainer } from 'react-toastify';
 import { ThemeProvider } from './components/theme-provider';
+import TournamentsTable from './pages/TournamentsTable';
 
 const isAuth = () => !!localStorage.getItem('access_token');
 
@@ -32,23 +33,25 @@ export default function App() {
         <Routes>
             {/* public */}
             <Route element={<PublicLayout />}>
+            <Route path="*" element={<NotFound />} />
             <Route path="/login" element={isAuth() ? <Navigate to="/dashboard" /> : <Login />} />
             <Route path="/register" element={isAuth() ? <Navigate to="/dashboard" /> : <Register />} />
-            <Route path="*" element={<NotFound />} />
             </Route>
 
             {/* private */}
             <Route element={<PrivateLayout />}>
+            <Route path="*" element={<NotFound />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/games" element={<GamesList />} />
             <Route path="/teams" element={<TeamsList />} />
-            <Route path="/tournaments" element={<TournamentsList />} />
+            {/* <Route path="/tournaments" element={<TournamentsTable />} /> */}
+            <Route path="/tournaments/*id" element={<NotFound />} />
             <Route path="/tournaments/:id" element={<TournamentDetail />} />
             <Route path="/tournaments/create" element={<TournamentCreate />} />
             <Route path="/matches/:id" element={<MatchDetail />} />
             {/* default redirect */}
             {/* <Route path="*" element={<Navigate to="/dashboard" />} /> */}
-            <Route path="*" element={<NotFound />} />
+            
             </Route>
             
         </Routes>

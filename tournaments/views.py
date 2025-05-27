@@ -3,6 +3,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 
 from accounts.permissions import IsModerator, IsReferee
 
@@ -61,6 +62,15 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         t = serializer.save()
         t.moderators.add(self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        t = self.get_object()
+        if t.status not in ['draft']:
+            return Response(
+                {'detail': "This opperation is not supported for tournament's current status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=["post"])
     def generate_bracket(self, request, pk=None):

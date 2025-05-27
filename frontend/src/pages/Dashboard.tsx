@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer,
   LineChart,
@@ -11,12 +12,22 @@ import {
   CartesianGrid,
   Tooltip
 } from 'recharts';
+import { type ChartConfig, ChartContainer } from '@/components/ui/chart';
+import { Badge } from '@/components/ui/badge';
+import TournamentsTable from './TournamentsTable';
+import type { Game, Tournament } from '../types';
 
-interface Game { id: number; name: string; }
-interface Tournament { id: number; title: string; status: string; game: Game; start_date: string; }
+// interface Game { id: number; name: string; }
+// interface Tournament { id: number; title: string; status: string; game: Game; start_date: string; }
 interface Profile { id: number; username: string; role?: 'admin' | 'moderator' | 'referee' | 'player'; }
 
 export default function Dashboard() {
+  const chartConfig = {
+    value: {
+      color: "hsl(var(--chart-1))",
+    }
+  } satisfies ChartConfig;
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [games, setGames] = useState<Game[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -103,7 +114,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 grid grid-cols-4 gap-6">
       {/* Left: Tournaments List */}
-      <div className="col-span-3">
+      {/* <div className="col-span-3">
         <h2 className="text-xl font-semibold mb-4">Tournaments</h2>
         <div className="mb-4">
           <label className="mr-2 font-medium">Discipline:</label>
@@ -132,6 +143,15 @@ export default function Dashboard() {
             </Card>
           ))}
         </div>
+      </div> */}
+      <div className='col-span-3'>
+        <h2 className='text-xl font-semibold mb-4'>
+          Tournaments
+        </h2>
+        <div className='mb-4'>
+          {/* ??? */}
+        </div>
+        <TournamentsTable initialTournaments={tournaments}></TournamentsTable>
       </div>
 
       {/* Right: Contextual Cards */}
@@ -169,15 +189,15 @@ export default function Dashboard() {
                   <Button variant={chartWindow === 7 ? 'secondary' : 'ghost'} onClick={() => setChartWindow(7)}>7d</Button>
                   <Button variant={chartWindow === 30 ? 'secondary' : 'ghost'} onClick={() => setChartWindow(30)}>30d</Button>
                 </div>
-                <ResponsiveContainer width="100%" height={200}>
+                <ChartContainer config={chartConfig} className='w-full'>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="value" />
+                    <Line type="monotone" dataKey="value" stroke="var(--chart-2)" />
                   </LineChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
             </Card>
           </>
@@ -185,15 +205,34 @@ export default function Dashboard() {
 
         {role === 'moderator' && (
           <>
-            <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold">My Tournaments</h3>
-                {myTournaments.map(t => <p key={t.id}>{t.title}</p>)}
+            <Card className='grid grid-cols-1 gap-1'>
+              <CardHeader>
+                <CardTitle className='font-bold text-lg text-center'>My Tournaments</CardTitle>
+                {/* <h3 className="text-lg font-semibold center">My Tournaments</h3> */}
+              </CardHeader>
+              <CardContent className='grid grid-cols-1 gap-2'>
+                  {myTournaments.map(t => 
+                    // <li key={t.id}>
+                    <Card className='grid grid-rows-1 h-1 items-center'>
+                      <CardContent className='flex-row text-xs gap-x-10'>
+                        <Link to={`/tournaments/${t.id}`} className='font-bold hover:underline'>
+                          {t.title}
+                        </Link>
+                        <Badge variant="secondary">
+                          {t.status}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                    // </li>
+                  )}
               </CardContent>
             </Card>
-            <Card>
+            <Card className='grid grid-cols-1 gap-1'>
+              <CardHeader>
+                <CardTitle className='font-bold text-lg'>Quick Actions</CardTitle>
+                {/* <h3 className="text-lg font-semibold center">My Tournaments</h3> */}
+              </CardHeader>
               <CardContent>
-                <h3 className="text-lg font-semibold">Quick Actions</h3>
                 <Button onClick={() => window.location.href = '/tournaments/create'}>
                   Create Tournament
                 </Button>
