@@ -3,6 +3,8 @@ from rest_framework import serializers
 
 from .models import Game, Match, Team, Tournament
 
+from accounts.serializers import UserSerializer
+
 User = get_user_model()
 
 
@@ -13,17 +15,33 @@ class GameSerializer(serializers.ModelSerializer):
 
 
 class TeamSerializer(serializers.ModelSerializer):
-    game = serializers.PrimaryKeyRelatedField(queryset=Game.objects.all())
-    captain = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.filter(role="player")
+    # game_id = serializers.PrimaryKeyRelatedField(
+    #     queryset=Game.objects.all(), write_only=True, source="game"
+    # )
+    game = GameSerializer(read_only=True)
+    game_id = serializers.PrimaryKeyRelatedField(
+        queryset=Game.objects.all(), write_only=True
     )
-    members = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=User.objects.filter(role="player")
-    )
+
+    captain = UserSerializer(read_only=True)
+    members = UserSerializer(many=True, read_only=True)
+
+    # captain = serializers.PrimaryKeyRelatedField(
+    #     queryset=User.objects.filter(role="player")
+    # )
+    # members = serializers.PrimaryKeyRelatedField(
+    #     many=True, queryset=User.objects.filter(role="player")
+    # )
 
     class Meta:
         model = Team
-        fields = ("id", "name", "game", "captain", "members")
+        fields = ("id", "name", "game", "game_id", "captain", "members")
+
+
+class TeamCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Team
+        fields = ["name", "game"]
 
 
 class TournamentSerializer(serializers.ModelSerializer):

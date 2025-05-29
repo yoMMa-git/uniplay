@@ -13,6 +13,7 @@ import Navbar from './components/Navbar';
 import { ToastContainer } from 'react-toastify';
 import { ThemeProvider } from './components/theme-provider';
 import TournamentsTable from './pages/TournamentsTable';
+import TeamDetail from './pages/TeamDetail';
 
 const isAuth = () => !!localStorage.getItem('access_token');
 
@@ -41,9 +42,11 @@ export default function App() {
             {/* private */}
             <Route element={<PrivateLayout />}>
             <Route path="*" element={<NotFound />} />
+            <Route path="/" element={<Navigate to="/dashboard" />}/>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/games" element={<GamesList />} />
             <Route path="/teams" element={<TeamsList />} />
+            <Route path="/teams/:id" element={<TeamDetail />} />
             {/* <Route path="/tournaments" element={<TournamentsTable />} /> */}
             <Route path="/tournaments/*id" element={<NotFound />} />
             <Route path="/tournaments/:id" element={<TournamentDetail />} />

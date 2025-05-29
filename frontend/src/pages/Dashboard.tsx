@@ -14,12 +14,13 @@ import {
 } from 'recharts';
 import { type ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import TournamentsTable from './TournamentsTable';
-import type { Game, Tournament } from '../types';
+import type { Game, Tournament, User } from '../types';
 
 // interface Game { id: number; name: string; }
 // interface Tournament { id: number; title: string; status: string; game: Game; start_date: string; }
-interface Profile { id: number; username: string; role?: 'admin' | 'moderator' | 'referee' | 'player'; }
+// interface Profile { id: number; username: string; role?: 'admin' | 'moderator' | 'referee' | 'player'; }
 
 export default function Dashboard() {
   const chartConfig = {
@@ -28,7 +29,7 @@ export default function Dashboard() {
     }
   } satisfies ChartConfig;
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
   const [games, setGames] = useState<Game[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedGame, setSelectedGame] = useState<number | ''>('');
@@ -56,7 +57,7 @@ export default function Dashboard() {
     api.get('/tournaments/').then(res => setTournamentCount(res.data.length));
   }, []);
 
-  const role = (profile?.role as Profile['role']) || 'player';
+  const role = (profile?.role as User['role']) || 'player';
 
   useEffect(() => {
     if (!profile) return;
@@ -109,49 +110,19 @@ export default function Dashboard() {
        });
   }, [profile, selectedGame, chartWindow]);
 
-  if (!profile) return <div>Loading profile…</div>;
+  if (!profile) return <Label>Loading profile…</Label>;
 
   return (
     <div className="p-6 grid grid-cols-4 gap-6">
       {/* Left: Tournaments List */}
-      {/* <div className="col-span-3">
-        <h2 className="text-xl font-semibold mb-4">Tournaments</h2>
-        <div className="mb-4">
-          <label className="mr-2 font-medium">Discipline:</label>
-          <select
-            value={selectedGame}
-            onChange={e => setSelectedGame(e.target.value ? Number(e.target.value) : '')}
-            className="border rounded-lg px-2 py-1"
-          >
-            <option value="">All</option>
-            {games.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-4">
-          {tournaments.map(t => (
-            <Card key={t.id}>
-              <CardContent>
-                <h3 className="text-lg font-semibold">{t.title}</h3>
-                <p>Discipline: {t.game.name}</p>
-                <p>Status: {t.status}</p>
-                <Button className="mt-2" onClick={() => window.location.href = `/tournaments/${t.id}`}>
-                  View
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div> */}
       <div className='col-span-3'>
         <h2 className='text-xl font-semibold mb-4'>
           Tournaments
         </h2>
         <div className='mb-4'>
-          {/* ??? */}
+          {/* TODO: ??? */}
         </div>
-        <TournamentsTable initialTournaments={tournaments}></TournamentsTable>
+        <TournamentsTable initialTournaments={tournaments} role={role}></TournamentsTable>
       </div>
 
       {/* Right: Contextual Cards */}

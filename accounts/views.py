@@ -2,13 +2,20 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.mail import send_mail
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import generics, permissions, status, viewsets, filters
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .permissions import CanManageUser
 from .serializers import RegisterSerializer, UserSerializer
 
 User = get_user_model()
+
+
+class UserPagination(PageNumberPagination):
+    page_size = 10
 
 
 class RegisterView(generics.CreateAPIView):
@@ -63,6 +70,11 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    search_fields = ["username"]
+    filterset_fields = ["role"]
+    pagination_class = UserPagination
 
     def get_permissions(self):
         if self.action in ["list", "retrieve", "destroy", "update", "partial_update"]:
