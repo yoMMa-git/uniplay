@@ -28,9 +28,30 @@ class Team(models.Model):
     members = models.ManyToManyField(
         User, related_name="teams", limit_choices_to={"role": "player"}
     )
+    avatar = models.ImageField(upload_to="team_avatars/", null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.game.name})"
+
+
+class Invitation(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("declined", "Declined"),
+    ]
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="invitations")
+    invitee = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="invitations_recieved"
+    )
+    inviter = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="invitations_sent"
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("team", "invitee")
 
 
 class Tournament(models.Model):
@@ -91,6 +112,7 @@ class Match(models.Model):
     participant_b = models.ForeignKey(
         Team, on_delete=models.CASCADE, related_name="matches_as_b"
     )
+    winner = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     timestamp = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ongoing")
     dispute_notes = models.TextField(blank=True)

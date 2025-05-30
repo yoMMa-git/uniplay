@@ -1,5 +1,5 @@
 // src/pages/TeamDetail.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +37,10 @@ export default function TeamDetail() {
   const [hasMore, setHasMore] = useState(false);
   const [inviting, setInviting] = useState<Record<number, boolean>>({});
 
+  // Выгрузка аватара
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
   // Загрузка команды и профиля
   useEffect(() => {
     if (!id) return;
@@ -52,6 +56,17 @@ export default function TeamDetail() {
       .catch(console.error)
       .finally(() => setLoadingTeam(false));
   }, [id]);
+
+  // Подгрузка аватара
+  useEffect(() => {
+    if (team?.avatar) {
+      const base = import.meta.env.VITE_APP_URL || 'http://localhost:8000';
+      const url = team.avatar.startsWith('http')
+        ? team.avatar
+        : `${base}${team.avatar}`;
+      setAvatarUrl(url);
+    }
+  }, [team]);
 
   // Debounce поиска
   useEffect(() => {
@@ -91,6 +106,34 @@ export default function TeamDetail() {
     }
   };
 
+  const handleAvatar = async (file: File) => {
+    const fd = new FormData();
+    fd.append('avatar', file);
+    await api.patch(`/teams/${team?.id}`, fd, {
+      headers: {'Content-Type':'multipart/form-data'}
+    });
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!team || !e.target.files?.[0]) return;
+    const fd = new FormData();
+    fd.append('avatar', e.target.files[0]);
+    try {
+      const patchRes = await api.patch<Team>(`/teams/${team.id}/`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      console.log('PATCH response:', patchRes.data.avatar);
+      const tr = await api.get<Team>(`/teams/${team.id}/`);
+      console.log('GET after patch:', tr.data);
+      setTeam(tr.data);
+      setAvatarUrl(tr.data.avatar ?? null);
+      toast.success('Аватар обновлён');
+    } catch (err) {
+      console.error(err);
+      toast.error('Ошибка загрузки аватара')
+    }
+  }
+
   if (loadingTeam) return <div>Загрузка…</div>;
   if (!team) return <div>Команда не найдена</div>;
 
@@ -104,15 +147,53 @@ export default function TeamDetail() {
       <Button variant="ghost" onClick={() => navigate(-1)}>
         ← Назад
       </Button>
-      <Card>
+      <Card className='relative'>
         <CardContent>
+          <div className='absolute top-4 right-4'>
+            {avatarUrl ? (
+              <img 
+                src={avatarUrl} 
+                alt="Team Avatar"
+                className="w-16 h-16 rounded-full cursor-pointer border-2 border-gray-200"
+                onClick={() => fileInputRef.current?.click()}
+              />
+            ) : (
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Добавить аватар
+              </Button>
+            )}
+            <input 
+              type='file'
+              accept='image/*'
+              className='opacity-0 absolute inset-0 w-full h-full cursor-pointer'
+              ref={fileInputRef}
+              onChange={handleAvatarChange}
+            />
+          </div>
+          
           <h1 className="text-2xl font-bold">{team.name}</h1>
           <p><strong>Дисциплина:</strong> {team.game.name}</p>
           <p><strong>Капитан:</strong> {team.captain.username}</p>
+          <p>Tournaments: {team.tournaments_count}</p>
+          <p>Matches: {team.matches_count}</p>
+          <p>Winrate: {team.wins_count / team.losses_count}</p>
           <h2 className="mt-4 font-semibold">Участники ({team.members.length}):</h2>
-          <ul className="list-disc list-inside">
+          <ul className="list-none">
             {team.members.map(m => (
-              <li key={m.id}>{m.username}</li>
+              <li key={m.id} className='flex item-center justify-between py-2 border-b last:border-0'>
+                <span>{m.username}</span>
+                {profile?.id===team.captain.id && m.id!==profile.id && (
+                  <Button size='sm' variant='destructive' className='ml-4'
+                    onClick={()=>api.post(`/teams/${team.id}/remove_member`, {user_id:m.id}).then(()=>{setTeam(prev=>({...prev!, members: prev!.members.filter(x=>x.id!==m.id)}))})}
+                  >
+                    Remove
+                  </Button>
+                )} 
+              </li>
             ))}
           </ul>
           {canInvite ? (
@@ -182,6 +263,13 @@ export default function TeamDetail() {
                     Команда заполнена ({currentCount}/{maxPlayers})
                 </p>
             )
+        )}
+        {team.members.some(m => m.id===profile?.id) && profile?.id!==team.captain.id && (
+          <div className='mt-6'>
+            <Button variant="destructive" onClick={()=>api.post(`/teams/${team.id}/leave/`).then(()=>navigate('/teams'))}>
+              Leave team
+            </Button>
+          </div>
         )}
         </CardContent>
       </Card>

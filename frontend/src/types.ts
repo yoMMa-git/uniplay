@@ -1,5 +1,7 @@
 // src/types.ts
 
+import type { StringToBoolean } from "class-variance-authority/types";
+
 export interface User { 
   id: number;
   username: string;
@@ -39,4 +41,16 @@ export interface Team {
     game: Game;
     members: User[];
     captain: User;
+    avatar: string;
+    tournaments_count: number;
+    matches_count: number;
+    wins_count: number;
+    losses_count: number;
+}
+
+export interface Invitation {
+    id: number;
+    team: Team;
+    invitee: User;
+    inviter: User;
 }

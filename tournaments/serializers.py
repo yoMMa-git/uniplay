@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Game, Match, Team, Tournament
+from .models import Game, Match, Team, Tournament, Invitation
 
 from accounts.serializers import UserSerializer
 
@@ -15,33 +15,53 @@ class GameSerializer(serializers.ModelSerializer):
 
 
 class TeamSerializer(serializers.ModelSerializer):
-    # game_id = serializers.PrimaryKeyRelatedField(
-    #     queryset=Game.objects.all(), write_only=True, source="game"
-    # )
     game = GameSerializer(read_only=True)
     game_id = serializers.PrimaryKeyRelatedField(
         queryset=Game.objects.all(), write_only=True
     )
-
     captain = UserSerializer(read_only=True)
     members = UserSerializer(many=True, read_only=True)
+    avatar = serializers.ImageField(use_url=True, required=False)
 
-    # captain = serializers.PrimaryKeyRelatedField(
-    #     queryset=User.objects.filter(role="player")
-    # )
-    # members = serializers.PrimaryKeyRelatedField(
-    #     many=True, queryset=User.objects.filter(role="player")
-    # )
+    tournaments_count = serializers.IntegerField(read_only=True)
+    matches_count = serializers.IntegerField(read_only=True)
+    wins_count = serializers.IntegerField(read_only=True)
+    losses_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Team
-        fields = ("id", "name", "game", "game_id", "captain", "members")
+        fields = [
+            "id",
+            "name",
+            "game",
+            "game_id",
+            "captain",
+            "members",
+            "avatar",
+            "tournaments_count",
+            "matches_count",
+            "wins_count",
+            "losses_count",
+        ]
 
 
 class TeamCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
         fields = ["name", "game"]
+
+
+class InvitationSerializer(serializers.ModelSerializer):
+    invitee = UserSerializer(read_only=True)
+    inviter = UserSerializer(read_only=True)
+    invitee_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role="player"), write_only=True, source="invitee"
+    )
+
+    class Meta:
+        model = Invitation
+        fields = ["id", "team", "invitee", "inviter", "status", "created_at"]
+        read_only_fields = ["team", "inviter", "status", "created_at"]
 
 
 class TournamentSerializer(serializers.ModelSerializer):

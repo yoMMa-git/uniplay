@@ -14,6 +14,7 @@ import { ToastContainer } from 'react-toastify';
 import { ThemeProvider } from './components/theme-provider';
 import TournamentsTable from './pages/TournamentsTable';
 import TeamDetail from './pages/TeamDetail';
+import InvitationsPage from './pages/InvitationsPage';
 
 const isAuth = () => !!localStorage.getItem('access_token');
 
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/teams" element={<TeamsList />} />
             <Route path="/teams/:id" element={<TeamDetail />} />
             {/* <Route path="/tournaments" element={<TournamentsTable />} /> */}
+            <Route path="/invitations" element={<InvitationsPage />} />
             <Route path="/tournaments/*id" element={<NotFound />} />
             <Route path="/tournaments/:id" element={<TournamentDetail />} />
             <Route path="/tournaments/create" element={<TournamentCreate />} />
