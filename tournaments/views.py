@@ -1,6 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Count, Case, When, F, IntegerField
+from django.db import IntegrityError
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -38,12 +39,10 @@ class TeamViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["captain", "game", "members"]
 
-    parser_classes = [MultiPartParser, FormParser]
-
-    # def get_serializer_class(self):
-    #     if self.action in ["list", "retrieve"]:
-    #         return TeamSerializer
-    #     return TeamCreateSerializer
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve", "partial_update"]:
+            return TeamSerializer
+        return TeamCreateSerializer
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -282,6 +281,70 @@ class TournamentViewSet(viewsets.ModelViewSet):
         tournament.status = "ongoing"
         tournament.save()
         return Response({"detail": "Bracket generated."})
+
+    @action(detail=True, methods=["post"], url_path="register")
+    def register(self, request, pk=None):
+        tournament = self.get_object()
+
+        # Проверка статуса турнира
+        if tournament.status != "registration":
+            return Response(
+                {"detail": "Регистрация на этот турнир уже завершена."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Проверка на корректность запроса
+        team_id = request.data.get("team_id")
+        if not team_id:
+            return Response(
+                {"team_id": "Это поле обязательно."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверка на существование команды
+        team = get_object_or_404(Team, pk=team_id)
+        if team.captain.id != request.user.id and request.user.role != "admin":
+            return Response(
+                {"detail": "У вас недостаточно прав для совершения этой операции."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Проверка на повторную регистрацию
+        if tournament.teams.filter(id=team.id).exists():
+            return Response(
+                {"detail": "Эта команда уже зарегистрирована на турнир"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            tournament.teams.add(team)
+        except IntegrityError:
+            return Response(
+                {"detail": "Не удалось зарегистрировать команду"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="unregister")
+    def unregister(self, request, pk=None):
+        tournament = self.get_object()
+        team_id = request.data.get("team_id")
+
+        team = get_object_or_404(Team, pk=team_id)
+        if team.captain.id != request.user.id and request.user.role != "admin":
+            return Response(
+                {"detail": "У вас недостаточно прав для совершения этой операции."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            tournament.teams.remove(team)
+        except IntegrityError:
+            return Response(
+                {"detail": "Не удалось отменить регистрацию команды."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MatchViewSet(viewsets.ModelViewSet):

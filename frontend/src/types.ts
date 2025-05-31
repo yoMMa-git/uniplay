@@ -1,25 +1,22 @@
 // src/types.ts
 
-import type { StringToBoolean } from "class-variance-authority/types";
-
-export interface User { 
+export interface User {
   id: number;
   username: string;
   email?: string;
   phone?: string;
   avatar?: string;
   real_name?: string;
-  role?: 'admin' | 'moderator' | 'referee' | 'player';
+  role?: "admin" | "moderator" | "referee" | "player";
   is_email_verified?: boolean;
 }
 
-
 export type TournamentStatus =
-  | 'draft'
-  | 'registration'
-  | 'ongoing'
-  | 'stopped'
-  | 'finished';
+  | "draft"
+  | "registration"
+  | "ongoing"
+  | "stopped"
+  | "finished";
 
 export interface Game {
   id: number;
@@ -28,29 +25,39 @@ export interface Game {
 }
 
 export interface Tournament {
-    id: number;
-    title: string;
-    status: TournamentStatus;
-    game: Game;
-    start_date: string;
+  id: number;
+  title: string;
+  status: TournamentStatus;
+  game: Game;
+  start_date: string;
+  teams: Team[];
+  matches: Match[];
 }
 
 export interface Team {
-    id: number;
-    name: string;
-    game: Game;
-    members: User[];
-    captain: User;
-    avatar: string;
-    tournaments_count: number;
-    matches_count: number;
-    wins_count: number;
-    losses_count: number;
+  id: number;
+  name: string;
+  game: Game;
+  members: User[];
+  captain: User;
+  avatar: string;
+  tournaments_count: number;
+  matches_count: number;
+  wins_count: number;
+  losses_count: number;
+}
+
+export interface Match {
+  id: number;
+  round_number: number;
+  participant_a: Team;
+  participant_b: Team;
+  status: string;
 }
 
 export interface Invitation {
-    id: number;
-    team: Team;
-    invitee: User;
-    inviter: User;
+  id: number;
+  team: Team;
+  invitee: User;
+  inviter: User;
 }

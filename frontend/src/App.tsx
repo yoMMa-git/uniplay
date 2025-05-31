@@ -1,22 +1,26 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import GamesList from './pages/GamesList';
-import TeamsList from './pages/TeamsList';
-import TournamentCreate from './pages/TournamentCreate';
-import TournamentsList from './pages/TournamentsTable';
-import TournamentDetail from './pages/TournamentDetail';
-import MatchDetail from './pages/MatchDetail';
-import NotFound from './pages/NotFound';
-import Navbar from './components/Navbar';
-import { ToastContainer } from 'react-toastify';
-import { ThemeProvider } from './components/theme-provider';
-import TournamentsTable from './pages/TournamentsTable';
-import TeamDetail from './pages/TeamDetail';
-import InvitationsPage from './pages/InvitationsPage';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import GamesList from "./pages/GamesList";
+import TeamsList from "./pages/TeamsList";
+import TournamentCreate from "./pages/TournamentCreate";
+import TournamentDetail from "./pages/TournamentDetail";
+import MatchDetail from "./pages/MatchDetail";
+import NotFound from "./pages/NotFound";
+import Navbar from "./components/Navbar";
+import { ToastContainer } from "react-toastify";
+import { ThemeProvider } from "./components/theme-provider";
+import TeamDetail from "./pages/TeamDetail";
+import InvitationsPage from "./pages/InvitationsPage";
 
-const isAuth = () => !!localStorage.getItem('access_token');
+const isAuth = () => !!localStorage.getItem("access_token");
 
 const PublicLayout = () => <Outlet />;
 
@@ -30,20 +34,26 @@ const PrivateLayout = () => (
 export default function App() {
   return (
     <ThemeProvider>
-        <Router>
+      <Router>
         <ToastContainer />
         <Routes>
-            {/* public */}
-            <Route element={<PublicLayout />}>
+          {/* public */}
+          <Route element={<PublicLayout />}>
             <Route path="*" element={<NotFound />} />
-            <Route path="/login" element={isAuth() ? <Navigate to="/dashboard" /> : <Login />} />
-            <Route path="/register" element={isAuth() ? <Navigate to="/dashboard" /> : <Register />} />
-            </Route>
+            <Route
+              path="/login"
+              element={isAuth() ? <Navigate to="/dashboard" /> : <Login />}
+            />
+            <Route
+              path="/register"
+              element={isAuth() ? <Navigate to="/dashboard" /> : <Register />}
+            />
+          </Route>
 
-            {/* private */}
-            <Route element={<PrivateLayout />}>
+          {/* private */}
+          <Route element={<PrivateLayout />}>
             <Route path="*" element={<NotFound />} />
-            <Route path="/" element={<Navigate to="/dashboard" />}/>
+            <Route path="/" element={<Navigate to="/dashboard" />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/games" element={<GamesList />} />
             <Route path="/teams" element={<TeamsList />} />
@@ -56,11 +66,9 @@ export default function App() {
             <Route path="/matches/:id" element={<MatchDetail />} />
             {/* default redirect */}
             {/* <Route path="*" element={<Navigate to="/dashboard" />} /> */}
-            
-            </Route>
-            
+          </Route>
         </Routes>
-        </Router>
+      </Router>
     </ThemeProvider>
   );
 }

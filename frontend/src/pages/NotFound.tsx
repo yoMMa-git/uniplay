@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export default function NotFound() {
             </p>
             <div className="flex space-x-2">
               <Button onClick={() => navigate(-1)}>Назад</Button>
-              <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              <Button variant="outline" onClick={() => navigate("/dashboard")}>
                 На главную
               </Button>
             </div>

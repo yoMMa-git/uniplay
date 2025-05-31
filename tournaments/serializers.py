@@ -16,9 +16,9 @@ class GameSerializer(serializers.ModelSerializer):
 
 class TeamSerializer(serializers.ModelSerializer):
     game = GameSerializer(read_only=True)
-    game_id = serializers.PrimaryKeyRelatedField(
-        queryset=Game.objects.all(), write_only=True
-    )
+    # game_id = serializers.PrimaryKeyRelatedField(
+    #     queryset=Game.objects.all(), write_only=True
+    # )
     captain = UserSerializer(read_only=True)
     members = UserSerializer(many=True, read_only=True)
     avatar = serializers.ImageField(use_url=True, required=False)
@@ -34,7 +34,6 @@ class TeamSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "game",
-            "game_id",
             "captain",
             "members",
             "avatar",
@@ -112,6 +111,9 @@ class TournamentCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class MatchSerializer(serializers.ModelSerializer):
+    participant_a = TeamSerializer()
+    participant_b = TeamSerializer()
+
     class Meta:
         model = Match
         fields = (

@@ -12,5 +12,5 @@ class CustomUserAdmin(UserAdmin):
             {"fields": ("phone", "avatar", "real_name", "role", "is_email_verified")},
         ),
     )
-    list_display = ("username", "email", "role", "is_email_verified")
+    list_display = ("id", "username", "email", "role", "is_email_verified")
     list_filter = ("role", "is_email_verified")
