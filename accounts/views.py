@@ -9,7 +9,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .permissions import CanManageUser
-from .serializers import RegisterSerializer, UserSerializer
+from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer
 
 User = get_user_model()
 
@@ -86,3 +86,27 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.request.user.role == "moderator":
             return qs.exclude(role="admin")
         return qs
+
+
+class ChangePasswordView(generics.UpdateAPIView):
+    serializer_class = ChangePasswordSerializer
+    model = User
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not user.check_password(serializer.validated_data["old_password"]):
+            return Response(
+                {"old_password": "Старый пароль не совпадает с текущим."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.set_password(serializer.validated_data["new_password"])
+        user.save()
+        return Response(
+            {"detail": "Пароль успешно изменён!"}, status=status.HTTP_200_OK
+        )

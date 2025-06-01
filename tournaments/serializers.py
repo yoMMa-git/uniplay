@@ -51,6 +51,11 @@ class TeamCreateSerializer(serializers.ModelSerializer):
 
 
 class InvitationSerializer(serializers.ModelSerializer):
+    """
+    POST /teams/{id}/invite
+    """
+
+    team = TeamSerializer(read_only=True)
     invitee = UserSerializer(read_only=True)
     inviter = UserSerializer(read_only=True)
     invitee_id = serializers.PrimaryKeyRelatedField(
@@ -59,7 +64,15 @@ class InvitationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Invitation
-        fields = ["id", "team", "invitee", "inviter", "status", "created_at"]
+        fields = [
+            "id",
+            "team",
+            "invitee",
+            "inviter",
+            "invitee_id",
+            "status",
+            "created_at",
+        ]
         read_only_fields = ["team", "inviter", "status", "created_at"]
 
 
@@ -111,8 +124,9 @@ class TournamentCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class MatchSerializer(serializers.ModelSerializer):
-    participant_a = TeamSerializer()
-    participant_b = TeamSerializer()
+    participant_a = TeamSerializer(read_only=True)
+    participant_b = TeamSerializer(read_only=True)
+    tournament = TournamentSerializer(read_only=True)
 
     class Meta:
         model = Match
@@ -122,7 +136,32 @@ class MatchSerializer(serializers.ModelSerializer):
             "round_number",
             "participant_a",
             "participant_b",
-            "timestamp",
+            "score_a",
+            "score_b",
+            "start_time",
             "status",
             "dispute_notes",
         )
+
+
+class MatchResultSerializer(serializers.Serializer):
+    """POST /matches/{id}/result"""
+
+    score_a = serializers.IntegerField()
+    score_b = serializers.IntegerField()
+
+    def validate(self, data):
+        if data["score_a"] < 0 or data["score_b"] < 0:
+            raise serializers.ValidationError("Счёт не может быть отрицательным!")
+        return data
+
+
+class MatchAppealSerializer(serializers.Serializer):
+    """POST /matches/{id}/appeal"""
+
+    text = serializers.CharField()
+
+    def validate_text(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Текст жалобы не может быть пустым!")
+        return value

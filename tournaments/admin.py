@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Game, Match, Team, Tournament
+from .models import Game, Match, Team, Tournament, Invitation
 
 
 @admin.register(Game)
@@ -10,7 +10,7 @@ class GameAdmin(admin.ModelAdmin):
 
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
-    list_display = ("name", "game", "captain")
+    list_display = ("id", "name", "game", "captain")
     list_filter = ("game",)
     filter_horizontal = ("members",)
 
@@ -32,3 +32,8 @@ class MatchAdmin(admin.ModelAdmin):
         "status",
     )
     list_filter = ("status", "tournament")
+
+
+@admin.register(Invitation)
+class InvitationAdmin(admin.ModelAdmin):
+    list_display = ("invitee", "inviter", "status", "team")

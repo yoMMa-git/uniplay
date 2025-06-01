@@ -1,3 +1,4 @@
+// src/pages/Dashboard.tsx
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,15 +16,12 @@ import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import TournamentsTable from "./TournamentsTable";
-import type { Game, Tournament, User } from "../types";
-
-// interface Game { id: number; name: string; }
-// interface Tournament { id: number; title: string; status: string; game: Game; start_date: string; }
-// interface Profile { id: number; username: string; role?: 'admin' | 'moderator' | 'referee' | 'player'; }
+import type { Game, Tournament, User, Match } from "../types";
 
 export default function Dashboard() {
   const chartConfig = {
     value: {
+      label: "Турниры",
       color: "hsl(var(--chart-1))",
     },
   } satisfies ChartConfig;
@@ -49,7 +47,7 @@ export default function Dashboard() {
     []
   );
   const [pendingDisputes, setPendingDisputes] = useState<any[]>([]);
-  const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
+  const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
 
   useEffect(() => {
     api
@@ -94,16 +92,33 @@ export default function Dashboard() {
     if (profile.role === "player") {
       const now = new Date().toISOString();
       const inHour = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      api
-        .get("/matches/", {
-          params: {
-            status: "ongoing",
-            timestamp__gte: now,
-            timestamp__lte: inHour,
-            participant_a__members: profile.id,
-          },
+      const paramsA = {
+        status: "ongoing",
+        // timestamp__gte: now,
+        // timestamp__lte: inHour,
+        participant_a__members: profile.id,
+      };
+      const paramsB = {
+        status: "ongoing",
+        // start_time__gte: now,
+        // start_time__lte: inHour,
+        participant_b__members: profile.id,
+      };
+
+      Promise.all([
+        api.get<Match[]>("/matches/", { params: paramsA }),
+        api.get<Match[]>("/matches/", { params: paramsB }),
+      ])
+        .then(([resA, resB]) => {
+          const combined = [...resA.data, ...resB.data];
+          const unique: Record<number, Match> = {};
+          combined.forEach((m) => {
+            unique[m.id] = m;
+          });
+          console.log(unique);
+          setUpcomingMatches(Object.values(unique));
         })
-        .then((res) => setUpcomingMatches(res.data));
+        .catch(() => setUpcomingMatches([]));
     }
 
     // Chart data fetch
@@ -131,11 +146,8 @@ export default function Dashboard() {
       {/* Left: Tournaments List */}
       <div className="col-span-3">
         <h2 className="text-xl font-semibold mb-4">Турниры</h2>
-        <div className="mb-4">{/* TODO: ??? */}</div>
-        <TournamentsTable
-          initialTournaments={tournaments}
-          role={role}
-        ></TournamentsTable>
+        <div className="mb-4">{/* TODO: Возможно, фильтр по игре */}</div>
+        <TournamentsTable initialTournaments={tournaments} role={role} />
       </div>
 
       {/* Right: Contextual Cards */}
@@ -212,26 +224,21 @@ export default function Dashboard() {
                 <CardTitle className="font-bold text-lg text-center">
                   Мои турниры
                 </CardTitle>
-                {/* <h3 className="text-lg font-semibold center">My Tournaments</h3> */}
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-2">
-                {myTournaments.map(
-                  (t) => (
-                    // <li key={t.id}>
-                    <Card className="grid grid-rows-1 h-1 items-center">
-                      <CardContent className="flex-row text-xs gap-x-10">
-                        <Link
-                          to={`/tournaments/${t.id}`}
-                          className="font-bold hover:underline"
-                        >
-                          {t.title}
-                        </Link>
-                        <Badge variant="secondary">{t.status}</Badge>
-                      </CardContent>
-                    </Card>
-                  )
-                  // </li>
-                )}
+                {myTournaments.map((t) => (
+                  <Card key={t.id} className="shadow-sm">
+                    <CardContent className="flex justify-between items-center text-xs">
+                      <Link
+                        to={`/tournaments/${t.id}`}
+                        className="font-bold hover:underline"
+                      >
+                        {t.title}
+                      </Link>
+                      <Badge variant="secondary">{t.status}</Badge>
+                    </CardContent>
+                  </Card>
+                ))}
               </CardContent>
             </Card>
             <Card className="grid grid-cols-1 gap-1">
@@ -239,7 +246,6 @@ export default function Dashboard() {
                 <CardTitle className="font-bold text-lg">
                   Быстрые действия
                 </CardTitle>
-                {/* <h3 className="text-lg font-semibold center">My Tournaments</h3> */}
               </CardHeader>
               <CardContent>
                 <Button
@@ -258,7 +264,13 @@ export default function Dashboard() {
               <CardContent>
                 <h3 className="text-lg font-semibold">Назначенные турниры</h3>
                 {assignedTournaments.map((t) => (
-                  <p key={t.id}>{t.title}</p>
+                  <Link
+                    key={t.id}
+                    to={`/tournaments/${t.id}`}
+                    className="block hover:underline"
+                  >
+                    {t.title}
+                  </Link>
                 ))}
               </CardContent>
             </Card>
@@ -266,7 +278,13 @@ export default function Dashboard() {
               <CardContent>
                 <h3 className="text-lg font-semibold">Текущие споры</h3>
                 {pendingDisputes.map((m) => (
-                  <p key={m.id}>Match {m.id}</p>
+                  <Link
+                    key={m.id}
+                    to={`/matches/${m.id}`}
+                    className="block hover:underline"
+                  >
+                    Спор: матч {m.id}
+                  </Link>
                 ))}
               </CardContent>
             </Card>
@@ -277,11 +295,33 @@ export default function Dashboard() {
           <Card>
             <CardContent>
               <h3 className="text-lg font-semibold">Предстоящие матчи</h3>
-              {upcomingMatches.map((m) => (
-                <p key={m.id}>
-                  {m.participant_a.name} vs {m.participant_b.name}
-                </p>
-              ))}
+              {upcomingMatches.length > 0 ? (
+                <div className="grid grid-cols-1 gap-2 mt-2">
+                  {upcomingMatches.map((m) => (
+                    <Link key={m.id} to={`/matches/${m.id}`} className="block">
+                      <Card className="shadow-sm hover:shadow-md transition-shadow p-0">
+                        <CardContent className="py-1 px-2">
+                          <p className="text-xs font-semibold mb-1">
+                            {m.tournament?.title ?? "-"} (
+                            {m.tournament?.game?.name ?? "-"})
+                          </p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm">
+                              {m.participant_a ? m.participant_a.name : "BYE"}
+                            </span>
+                            <span className="text-sm text-gray-500">vs</span>
+                            <span className="text-sm">
+                              {m.participant_b ? m.participant_b.name : "BYE"}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p>Нет предстоящих матчей.</p>
+              )}
             </CardContent>
           </Card>
         )}

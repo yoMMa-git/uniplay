@@ -23,11 +23,11 @@ export default function Login() {
       const res = await api.post("/auth/token/", { username, password });
       localStorage.setItem("access_token", res.data.access);
       localStorage.setItem("refresh_token", res.data.refresh_token);
-      toast.success("Logged in successfully!");
+      toast.success("Аутентификация прошла успешно!");
       navigate("/dashboard", { replace: true });
     } catch (err) {
       console.log(err);
-      toast.error("Login failed");
+      toast.error("Произошла ошибка: проверьте правильность данных.");
     }
   };
 
@@ -35,18 +35,18 @@ export default function Login() {
     <div className="flex h-screen items-center justify-center">
       <Card className="p-8 w-96">
         <CardContent>
-          <h2 className="text-xl mb-4">Login</h2>
+          <h2 className="text-xl mb-4">Войти</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
+              placeholder="Никнейм"
             />
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
+              placeholder="Пароль"
             />
             <Button type="submit" className="w-full">
               Войти

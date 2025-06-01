@@ -6,6 +6,7 @@ import {
   Outlet,
 } from "react-router-dom";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import GamesList from "./pages/GamesList";
@@ -19,6 +20,8 @@ import { ToastContainer } from "react-toastify";
 import { ThemeProvider } from "./components/theme-provider";
 import TeamDetail from "./pages/TeamDetail";
 import InvitationsPage from "./pages/InvitationsPage";
+import TournamentsList from "./pages/TournamentsList";
+import MatchesList from "./pages/MatchesList";
 
 const isAuth = () => !!localStorage.getItem("access_token");
 
@@ -54,15 +57,18 @@ export default function App() {
           <Route element={<PrivateLayout />}>
             <Route path="*" element={<NotFound />} />
             <Route path="/" element={<Navigate to="/dashboard" />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/games" element={<GamesList />} />
             <Route path="/teams" element={<TeamsList />} />
             <Route path="/teams/:id" element={<TeamDetail />} />
             {/* <Route path="/tournaments" element={<TournamentsTable />} /> */}
             <Route path="/invitations" element={<InvitationsPage />} />
+            <Route path="/tournaments" element={<TournamentsList />} />
             <Route path="/tournaments/*id" element={<NotFound />} />
             <Route path="/tournaments/:id" element={<TournamentDetail />} />
             <Route path="/tournaments/create" element={<TournamentCreate />} />
+            <Route path="/matches" element={<MatchesList />} />
             <Route path="/matches/:id" element={<MatchDetail />} />
             {/* default redirect */}
             {/* <Route path="*" element={<Navigate to="/dashboard" />} /> */}

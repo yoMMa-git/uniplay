@@ -187,7 +187,7 @@ export default function TeamsList() {
                 key={team.id}
                 className="block hover:shadow-lg transition"
               >
-                <Card>
+                <Card className="h-full">
                   <CardContent className="flex justify-between items-start">
                     <div>
                       <h2 className="text-lg font-semibold">{team.name}</h2>

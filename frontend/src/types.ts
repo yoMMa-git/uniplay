@@ -3,12 +3,12 @@
 export interface User {
   id: number;
   username: string;
-  email?: string;
-  phone?: string;
-  avatar?: string;
-  real_name?: string;
-  role?: "admin" | "moderator" | "referee" | "player";
-  is_email_verified?: boolean;
+  email: string;
+  phone: string;
+  avatar: string;
+  real_name: string;
+  role: "admin" | "moderator" | "referee" | "player";
+  is_email_verified: boolean;
 }
 
 export type TournamentStatus =
@@ -32,6 +32,8 @@ export interface Tournament {
   start_date: string;
   teams: Team[];
   matches: Match[];
+  referees: User[];
+  moderators: User[];
 }
 
 export interface Team {
@@ -50,9 +52,13 @@ export interface Team {
 export interface Match {
   id: number;
   round_number: number;
+  start_date: string;
   participant_a: Team;
   participant_b: Team;
+  score_a: number;
+  score_b: number;
   status: string;
+  tournament: Tournament;
 }
 
 export interface Invitation {
@@ -60,4 +66,6 @@ export interface Invitation {
   team: Team;
   invitee: User;
   inviter: User;
+  status: string;
+  created_at?: string;
 }

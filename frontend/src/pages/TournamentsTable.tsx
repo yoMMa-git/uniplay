@@ -195,7 +195,8 @@ export default function TournamentsTable({
   const handleDelete = async (id: number) => {
     if (!window.confirm("Удалить этот турнир?")) return;
     try {
-      await api.delete(`/tournaments/${id}/`);
+      res = await api.delete(`/tournaments/${id}/`);
+      console.log(res);
       setTournaments((curr) => curr.filter((t) => t.id !== id));
     } catch (err: any) {
       console.error(err.response?.data || err);
@@ -208,10 +209,10 @@ export default function TournamentsTable({
       <Table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg text-center">
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Game</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
+            <TableHead className="text-center">Название</TableHead>
+            <TableHead className="text-center">Дисциплина</TableHead>
+            <TableHead className="text-center">Статус</TableHead>
+            <TableHead className="text-center">Действия</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

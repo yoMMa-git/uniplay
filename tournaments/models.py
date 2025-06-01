@@ -102,20 +102,53 @@ class Match(models.Model):
         ("finished", "Завершён"),
     ]
 
+    BRACKET_TYPES = [
+        ("WB", "Верхняя сетка"),
+        ("LB", "Нижняя сетка"),
+        ("RR", "Круговая сетка"),
+    ]
+
     tournament = models.ForeignKey(
         Tournament, on_delete=models.CASCADE, related_name="matches"
     )
     round_number = models.PositiveIntegerField()
+    bracket = models.CharField(max_length=3, choices=BRACKET_TYPES, default="WB")
+
     participant_a = models.ForeignKey(
-        Team, on_delete=models.CASCADE, related_name="matches_as_a"
+        Team,
+        on_delete=models.CASCADE,
+        related_name="matches_as_a",
+        null=True,
+        blank=True,
     )
     participant_b = models.ForeignKey(
-        Team, on_delete=models.CASCADE, related_name="matches_as_b"
+        Team,
+        on_delete=models.CASCADE,
+        related_name="matches_as_b",
+        null=True,
+        blank=True,
     )
+    score_a = models.IntegerField(default=0)
+    score_b = models.IntegerField(default=0)
     winner = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
-    timestamp = models.DateTimeField(blank=True, null=True)
+    next_match_win = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prev_match_winners",
+    )
+    next_match_loss = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prev_match_losers",
+    )
+
+    start_time = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ongoing")
-    dispute_notes = models.TextField(blank=True)
+    dispute_notes = models.TextField(blank=True, null=True)
 
     class Meta:
         unique_together = (
@@ -124,7 +157,7 @@ class Match(models.Model):
             "participant_a",
             "participant_b",
         )
-        ordering = ["round_number"]
+        ordering = ["round_number", "bracket", "id"]
 
     def __str__(self):
         return f"{self.tournament.title} | Round {self.round_number}: {self.participant_a} vs {self.participant_b}"

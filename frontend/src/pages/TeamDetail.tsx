@@ -102,7 +102,8 @@ export default function TeamDetail() {
   const handleInvite = async (userId: number) => {
     setInviting((prev) => ({ ...prev, [userId]: true }));
     try {
-      await api.post(`/teams/${team!.id}/invite/`, { user_id: userId });
+      console.log(team!.id);
+      await api.post(`/teams/${team!.id}/invite/`, { invitee_id: userId });
       toast.success("Приглашение отправлено");
       // удаляем из списка
       setUsers((prev) => prev.filter((u) => u.id !== userId));
@@ -152,11 +153,11 @@ export default function TeamDetail() {
     isCaptain && profile?.role === "player" && currentCount < maxPlayers;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 w-full">
       <Button variant="ghost" onClick={() => navigate(-1)}>
         ← Назад
       </Button>
-      <Card className="relative">
+      <Card className="relative w-full">
         <CardContent>
           <div className="absolute top-4 right-4">
             {avatarUrl ? (
@@ -211,7 +212,7 @@ export default function TeamDetail() {
                     className="ml-4"
                     onClick={() =>
                       api
-                        .post(`/teams/${team.id}/remove_member`, {
+                        .post(`/teams/${team.id}/remove_member/`, {
                           user_id: m.id,
                         })
                         .then(() => {
@@ -222,7 +223,7 @@ export default function TeamDetail() {
                         })
                     }
                   >
-                    Remove
+                    Выгнать
                   </Button>
                 )}
               </li>

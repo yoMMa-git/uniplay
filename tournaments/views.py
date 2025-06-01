@@ -13,10 +13,17 @@ from rest_framework import status
 from accounts.permissions import IsModerator, IsReferee
 
 from .models import Game, Match, Team, Tournament, Invitation
+from .utils import (
+    generate_single_bracket,
+    generate_double_bracket,
+    generate_round_robin,
+)
 from accounts.models import User
 from .serializers import (
     GameSerializer,
     MatchSerializer,
+    MatchResultSerializer,
+    MatchAppealSerializer,
     TeamSerializer,
     TeamCreateSerializer,
     TournamentCreateUpdateSerializer,
@@ -122,10 +129,14 @@ class TeamViewSet(viewsets.ModelViewSet):
         )
 
         if not created:
-            return Response(
-                {"detail": "Данный игрок уже был приглашён"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            if inv.status != "declined":
+                return Response(
+                    {"detail": "Данный игрок уже был приглашён"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            else:
+                inv.status = "pending"
+                inv.save()
         return Response(InvitationSerializer(inv).data, status=status.HTTP_201_CREATED)
 
         # user_id = request.data.get("user_id")
@@ -239,6 +250,9 @@ class TournamentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        """
+        Контекстно-ролевая фильтрация: убирает черновые турниры для игроков и судей
+        """
         qs = Tournament.objects.all()
         user = self.request.user
         if user.role not in ["admin", "moderator"]:
@@ -267,19 +281,35 @@ class TournamentViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "Tournament must be in registration status."}, status=400
             )
+
         teams = list(tournament.teams.all())
-        if len(teams) % 2 != 0:
-            return Response({"detail": "Even number of teams required."}, status=400)
-        Match.objects.filter(tournament=tournament).delete()
-        for i in range(0, len(teams), 2):
-            Match.objects.create(
-                tournament=tournament,
-                round_number=(i // 2) + 1,
-                participant_a=teams[i],
-                participant_b=teams[i + 1],
+
+        if len(teams) < 2:
+            return Response(
+                {"detail": "Недостаточное количество команд для начала турнира."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+        fmt = tournament.bracket_format
+        Match.objects.filter(tournament=tournament).delete()
+
+        if fmt == "single":
+            generate_single_bracket(tournament, teams)
+
+        elif fmt == "double":
+            generate_double_bracket(tournament, teams)
+
+        elif fmt == "round_robin":
+            generate_round_robin(tournament, teams)
+
+        else:
+            return Response(
+                {"detail": "Неизвестный формат турнира."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         tournament.status = "ongoing"
-        tournament.save()
+        tournament.save(update_fields=["status"])
         return Response({"detail": "Bracket generated."})
 
     @action(detail=True, methods=["post"], url_path="register")
@@ -346,19 +376,145 @@ class TournamentViewSet(viewsets.ModelViewSet):
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["post"], url_path="stop")
+    def stop(self, request, pk=None):
+        tournament = self.get_object()
+        if tournament.status != "registration":
+            return Response(
+                {"detail": "Данная операция запрещена для текущего состояния турнира"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if request.user.role not in ["admin", "moderator"]:
+            return Response(
+                {"detail": "У вас недостаточно прав для совершения данной операции"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        tournament.status = "draft"
+        tournament.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class MatchViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с матчем:
+    - GET /matches/{id}/            => retrieve()
+    - POST /matches/{id}/result/    => upload_result()
+    - POST /matches/{id}/appeal/    => appeal()
+    """
+
     queryset = Match.objects.all()
     serializer_class = MatchSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = [
         "status",
-        "tournament__referees",
+        "tournament",
         "participant_a__members",
         "participant_b__members",
+        "start_time",
     ]
 
-    def get_permissions(self):
-        if self.action in ["update", "partial_update"]:
-            return [IsAuthenticated(), IsReferee()]
-        return [IsAuthenticated()]
+    def retrieve(self, request, pk=None):
+        match = get_object_or_404(Match, pk=pk)
+        serializer = MatchSerializer(match)
+        return Response(serializer.data)
+
+    def get_queryset(self):
+        """
+        Контекстно-ролевая фильтрация: убирает матчи черновых турниров для игроков и судей
+        """
+        qs = super().get_queryset()
+        user = self.request.user
+
+        if user.role not in ["admin", "moderator"]:
+            return qs.exclude(tournament__status="draft")
+        return qs
+
+    @action(detail=True, methods=["post"], url_path="result")
+    def upload_result(self, request, pk=None):
+        match = get_object_or_404(Match, pk=pk)
+        user = request.user
+
+        is_captain = (
+            user.id == match.participant_a.captain.id
+            or user.id == match.participant_b.captain.id
+        )
+        is_referee = user.id in match.tournament.referees.values_list("id", flat=True)
+
+        if not (is_captain or is_referee):
+            return Response(
+                {"detail": "У вас недостаточно прав для совершения этой операции"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if match.status != "ongoing":
+            return Response(
+                {"detail": "Нельзя загрузить результат для этого матча"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = MatchResultSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        match.score_a = data["score_a"]
+        match.score_b = data["score_b"]
+        match.status = "finished"
+        match.save(update_fields=["score_a", "score_b", "status"])
+
+        return Response(
+            {
+                "detail": "Результат успешно сохранён!",
+                "status": "finished",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="appeal")
+    def appeal(self, request, pk=None):
+        match = get_object_or_404(Match, pk=pk)
+        user = request.user
+
+        is_captain = (
+            user.id == match.participant_a.captain.id
+            or user.id == match.participant_b.captain.id
+        )
+
+        if not is_captain:
+            return Response(
+                {"detail": "У вас недостаточно прав для соверешения этой операции."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if match.status == "ongoing":
+            return Response(
+                {"detail": "Жалобу можно подать только после окончания матча"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = MatchAppealSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        match.dispute_notes = data["text"]
+        match.status = "disputed"
+        match.save(update_fields=["dispute_notes", "status"])
+
+        return Response({"detail": "Жалоба успешно подана!"}, status=status.HTTP_200_OK)
+
+    # queryset = Match.objects.all()
+    # serializer_class = MatchSerializer
+    # filter_backends = [DjangoFilterBackend]
+    # filterset_fields = [
+    #     "status",
+    #     "tournament__referees",
+    #     "participant_a__members",
+    #     "participant_b__members",
+    # ]
+
+    # def get_permissions(self):
+    #     if self.action in ["update", "partial_update"]:
+    #         return [IsAuthenticated(), IsReferee()]
+    #     return [IsAuthenticated()]

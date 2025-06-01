@@ -11,6 +11,7 @@ export default function InvitationsPage() {
 
   useEffect(() => {
     api.get<Invitation[]>("/invitations/").then((r) => setInvites(r.data));
+    console.log(invites);
   }, []);
 
   const handle = async (id: number, action: "accept" | "decline") => {
@@ -31,7 +32,7 @@ export default function InvitationsPage() {
           <Card key={inv.id}>
             <CardContent className="flex justify-between items-center">
               <div>
-                Invite to <strong>{inv.team.name}</strong> от{" "}
+                Приглашение в <strong>{inv.team.name}</strong> от{" "}
                 <em>{inv.inviter.username}</em>
               </div>
               <div className="space-x-2">
