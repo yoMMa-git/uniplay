@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import type { Tournament, Team, Match } from "../types";
+import type { Tournament, Team, Match, TournamentStatus } from "../types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { tournamentStatusLabels } from "@/utils/statusLabels";
 
 interface Profile {
   id: number;
@@ -42,7 +43,7 @@ export default function TournamentDetail() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // Новое состояние: какую секцию показываем: "participants" или "bracket"
+  // Новое состояние: какую секцию показываем: "participants", "bracket" или "results"
   const [selectedView, setSelectedView] = useState<
     "participants" | "bracket" | "results"
   >("participants");
@@ -59,7 +60,6 @@ export default function TournamentDetail() {
       .then(([trRes, prRes]) => {
         const tr = trRes.data;
         setTournament(tr);
-        console.log(tr.standings);
         setTeams(tr.teams);
         setProfile(prRes.data);
       })
@@ -136,12 +136,10 @@ export default function TournamentDetail() {
       );
       console.log(res);
       toast.success("Турнир успешно завершён.");
-      // Обновляем статус турнира
       setTournament({
         ...tournament,
         status: "finished",
       });
-      // Можно сохранить res.data.standings в отдельный state, если нужно
     } catch (e: any) {
       console.error(e.response?.data || e);
       toast.error(e.response?.data?.detail || "Не удалось завершить турнир");
@@ -159,8 +157,22 @@ export default function TournamentDetail() {
 
   const userRole = profile?.role || "";
   const isAdminOrMod = userRole === "admin" || userRole === "moderator";
-  // Суды также могут завершать, следовательно:
   const canFinish = userRole !== "player" && tournament.status === "ongoing";
+
+  // Для Double-Elimination: отдельные списки матчей WB и LB
+  const wbMatches = matches.filter((m) => m.bracket === "WB");
+  const lbMatches = matches.filter((m) => m.bracket === "LB");
+
+  // Для Round-Robin: сгруппируем матчи по раундам
+  const rrMatchesByRound: Record<number, Match[]> = {};
+  if (tournament.bracket_format === "round_robin") {
+    matches.forEach((m) => {
+      if (!rrMatchesByRound[m.round_number]) {
+        rrMatchesByRound[m.round_number] = [];
+      }
+      rrMatchesByRound[m.round_number].push(m);
+    });
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -176,8 +188,14 @@ export default function TournamentDetail() {
             <strong>Дисциплина:</strong> {tournament.game.name}
           </p>
           <p>
+            <strong>Формат:</strong>{" "}
+            <Badge variant="secondary">{tournament.bracket_format}</Badge>
+          </p>
+          <p>
             <strong>Статус:</strong>{" "}
-            <Badge variant="secondary">{tournament.status}</Badge>
+            <Badge variant="secondary">
+              {tournamentStatusLabels[tournament.status as TournamentStatus]}
+            </Badge>
           </p>
 
           {/* Кнопка для генерации сетки (только при статусе registration) */}
@@ -216,7 +234,7 @@ export default function TournamentDetail() {
         <Select
           value={selectedView}
           onValueChange={(v) =>
-            setSelectedView(v as "participants" | "bracket")
+            setSelectedView(v as "participants" | "bracket" | "results")
           }
         >
           <SelectTrigger className="w-48">
@@ -274,18 +292,128 @@ export default function TournamentDetail() {
 
       {/* Секция сетки */}
       {selectedView === "bracket" && (
-        <Card>
-          <CardContent>
-            <h2 className="text-xl font-semibold mb-4">Сетка матчей</h2>
-            {loadingMatches ? (
-              <p>Загрузка матчей…</p>
-            ) : matches.length > 0 ? (
-              <Bracket matches={matches} />
-            ) : (
-              <p>Сетка ещё не сформирована или нет матчей.</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {tournament.bracket_format === "round_robin" ? (
+            // ===== Round-Robin =====
+            <Card>
+              <CardContent>
+                <h2 className="text-xl font-semibold mb-4">
+                  Round-Robin Сетка
+                </h2>
+                {loadingMatches ? (
+                  <p>Загрузка матчей…</p>
+                ) : Object.keys(rrMatchesByRound).length > 0 ? (
+                  Object.entries(rrMatchesByRound).map(
+                    ([roundNum, roundMatches]) => (
+                      <div key={roundNum} className="mb-6">
+                        <h3 className="text-lg font-medium mb-2">
+                          Раунд {roundNum}
+                        </h3>
+                        <Table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-center">
+                                Команда A
+                              </TableHead>
+                              <TableHead className="text-center">
+                                Команда B
+                              </TableHead>
+                              <TableHead className="text-center">
+                                Счёт
+                              </TableHead>
+                              <TableHead className="text-center">
+                                Статус
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {roundMatches.map((m) => {
+                              const aName = m.participant_a?.name || "—";
+                              const bName = m.participant_b?.name || "—";
+                              const score =
+                                m.participant_a && m.participant_b
+                                  ? `${m.score_a} : ${m.score_b}`
+                                  : "—";
+                              return (
+                                <TableRow key={m.id}>
+                                  <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                                    {aName}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                                    {bName}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                                    {score}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                                    <Badge variant="secondary">
+                                      {m.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                  )
+                ) : (
+                  <p>Матчи кругового турнира ещё не сформированы.</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : tournament.bracket_format === "single" ? (
+            // ===== Single-Elimination =====
+            <Card>
+              <CardContent>
+                <h2 className="text-xl font-semibold mb-4">Сетка Single</h2>
+                {loadingMatches ? (
+                  <p>Загрузка матчей…</p>
+                ) : matches.length > 0 ? (
+                  <Bracket matches={matches} />
+                ) : (
+                  <p>Сетка ещё не сформирована или нет матчей.</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            // ===== Double-Elimination: разделяем WB и LB =====
+            <>
+              {/* Верхняя сетка */}
+              <Card>
+                <CardContent>
+                  <h2 className="text-xl font-semibold mb-4">
+                    Верхняя сетка (WB)
+                  </h2>
+                  {loadingMatches ? (
+                    <p>Загрузка матчей…</p>
+                  ) : wbMatches.length > 0 ? (
+                    <Bracket matches={wbMatches} />
+                  ) : (
+                    <p>Верхняя сетка ещё не сформирована.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Нижняя сетка */}
+              <Card>
+                <CardContent>
+                  <h2 className="text-xl font-semibold mb-4">
+                    Нижняя сетка (LB)
+                  </h2>
+                  {loadingMatches ? (
+                    <p>Загрузка матчей…</p>
+                  ) : lbMatches.length > 0 ? (
+                    <Bracket matches={lbMatches} />
+                  ) : (
+                    <p>Нижняя сетка ещё не сформирована или пока нет матчей.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
       )}
 
       {/* Секция результатов */}
@@ -305,7 +433,6 @@ export default function TournamentDetail() {
                 </TableHeader>
                 <TableBody>
                   {tournament.standings.map((item: any) => {
-                    // Найдём полное имя команды по её ID из списка teams:
                     const teamObj = teams.find((t) => t.id === item.team_id);
                     return (
                       <TableRow key={item.team_id}>

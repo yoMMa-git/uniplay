@@ -136,6 +136,7 @@ class MatchSerializer(serializers.ModelSerializer):
             "id",
             "tournament",
             "round_number",
+            "bracket",
             "participant_a",
             "participant_b",
             "score_a",

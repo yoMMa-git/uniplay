@@ -16,7 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
-import type { User, Match } from "@/types";
+import type { User, Match, MatchStatus } from "@/types";
+import { matchStatusLabels } from "@/utils/statusLabels";
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>();
@@ -146,7 +147,9 @@ export default function MatchDetail() {
         <h1 className="text-2xl font-bold">{match.tournament.title}</h1>
         <p className="text-sm text-gray-600">
           Раунд {match.round_number} ―{" "}
-          <span className="capitalize">{match.status}</span>
+          <span className="capitalize">
+            {matchStatusLabels[match.status as MatchStatus]}
+          </span>
         </p>
       </div>
 

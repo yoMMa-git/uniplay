@@ -11,7 +11,8 @@ interface BracketProps {
   // round_number: number;
   // participant_a: { id: number; name: string } | null;
   // participant_b: { id: number; name: string } | null;
-  // result?: { team_a_score: number; team_b_score: number };
+  // score_a?: number;
+  // score_b?: number;
 }
 
 export default function Bracket({ matches }: BracketProps) {
@@ -52,7 +53,6 @@ export default function Bracket({ matches }: BracketProps) {
               >
                 <Card className="w-48 mb-6 shadow-md">
                   <CardContent className="p-2">
-                    {/* Названия команд и счёт */}
                     <div className="flex flex-col">
                       <div className="flex justify-between">
                         <span className="font-semibold text-sm text-left">
@@ -72,23 +72,11 @@ export default function Bracket({ matches }: BracketProps) {
                         </span>
                       </div>
                     </div>
-
-                    {/* При желании можно отобразить общий результат */}
-                    {/* {m.result?.team_a_score != null && m.result?.team_b_score != null ? (
-                      <div className="mt-2 text-center text-sm">
-                        {m.result.team_a_score} − {m.result.team_b_score}
-                      </div>
-                    ) : (
-                      <div className="mt-2 text-center text-sm text-gray-500">
-                        —
-                      </div>
-                    )} */}
                   </CardContent>
                 </Card>
               </Link>
             ))}
 
-            {/* Если в раунде нет матчей */}
             {matchesInRound.length === 0 && (
               <div className="h-24 flex items-center">
                 <span className="text-sm text-gray-500">Нет матчей</span>

@@ -40,9 +40,9 @@ class Team(models.Model):
 
 class Invitation(models.Model):
     STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("accepted", "Accepted"),
-        ("declined", "Declined"),
+        ("pending", "На рассмотрении"),
+        ("accepted", "Принято"),
+        ("declined", "Отклонено"),
     ]
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="invitations")
     invitee = models.ForeignKey(
@@ -62,9 +62,9 @@ class Tournament(models.Model):
     """Турнир с группами/сеткой"""
 
     FORMAT_CHOICES = [
-        ("single", "Single elimination"),
-        ("double", "Double elimination"),
-        ("round_robin", "Round-robin"),
+        ("single", "Олимпийская система"),
+        ("double", "Двойное выбывание"),
+        ("round_robin", "Круговая система"),
     ]
     STATUS_CHOICES = [
         ("draft", "Черновик"),
@@ -104,88 +104,318 @@ class Tournament(models.Model):
 
     def finalize(self):
         """
-        Завершение SE турнира и расставление мест.
-        Возвращает словарь с расположением команд по местам.
-        Алгоритм:
-        - Проверяем, что все матчи завершены
-        - Фиксируем максимальное количество раундов и собираем множество всех участников
-        - Словарь eliminated_round: по умолчанию у всех 0, потом по каждому этапу проходим и записываем, кто в каком раунде выбыл
-        - По отсортированным уникальным раундам раскидываем места и формируем конечный словарь
-        """
+        Завершает турнир и вычисляет полные standings для всех трёх форматов.
 
+        Для single-elimination:
+            - Проверяем, что все матчи finished.
+            - Определяем total_rounds = max(round_number).
+            - Для каждой команды вычисляем eliminated_round (первое поражение).
+            - Победителю (finisher) присваиваем eliminated_round = total_rounds+1.
+            - Группируем команды по eliminated_round, сортируем по убыванию и выставляем place.
+
+        Для double-elimination:
+            - Проверяем, что все матчи finished.
+            - Для каждой команды считаем first_loss и second_loss (т. е. раунд, когда она проиграла второй раз).
+            - Champion: у команды нет second_loss → loss_count=0, условный loss_round=∞.
+            - Runner-up: только одно поражение в финальном раунде WB → loss_count=1, loss_round=R.
+            - Все остальные: loss_count=2, loss_round=раннее или позднее, depending.
+            - Сортируем ключи (loss_count ASC, loss_round DESC, loss_bracket="WB"<"LB") и присваиваем place.
+
+        Для round-robin:
+            - Проверяем, что все RR-матчи finished.
+            - Считаем для каждой команды {points, wins, draws, losses, scored, conceded}.
+            - Вычисляем goal_diff = scored - conceded.
+            - Сортируем по (-points, -goal_diff, -scored, team.name).
+            - Присваиваем place (равным при полной одинаковости метрик).
+
+        Сохраняет в standings_data список словарей. Возвращает этот список.
+        """
         if self.status != "ongoing":
             raise ValidationError(
-                "Закончить можно только тот турнир, который проходит на данный момент!"
+                "Finalize можно вызывать только для турнира со статусом 'ongoing'."
             )
 
-        matches = self.matches.all()
+        # Общая проверка: все матчи турнира должны быть в status="finished"
+        all_matches = self.matches.all()
+        not_finished = all_matches.exclude(status="finished")
+        if not_finished.exists():
+            raise ValidationError(
+                "Нельзя завершить турнир: есть матчи, ещё не завершённые."
+            )
 
-        still_playing = matches.exclude(status="finished")
-        if still_playing.exists():
-            raise ValidationError("Не все матчи были завершены!")
+        fmt = self.bracket_format
+        # ===== SINGLE-ELIMINATION =====
+        if fmt == "single":
+            # 1) Узнаём, сколько раундов в сетке
+            agg = all_matches.aggregate(max_round=Max("round_number"))
+            total_rounds = agg["max_round"]
+            if total_rounds is None:
+                raise ValidationError("В турнире нет ни одного матча.")
 
-        agg = matches.aggregate(max_round=Max("round_number"))
-        total_rounds = agg["max_round"]
-        if total_rounds is None:
-            raise ValidationError("В турнире нет ни одного матча, нечего завершать.")
+            # 2) Собираем ID всех участников
+            participants = set()
+            for m in all_matches:
+                if m.participant_a_id:
+                    participants.add(m.participant_a_id)
+                if m.participant_b_id:
+                    participants.add(m.participant_b_id)
 
-        participants = set()
-        for m in matches:
-            if m.participant_a_id:
-                participants.add(m.participant_a_id)
-            if m.participant_b_id:
-                participants.add(m.participant_b_id)
+            # 3) Инициализируем eliminated_round = 0 для всех
+            eliminated_round = {tid: 0 for tid in participants}
 
-        eliminated_round = {team_id: 0 for team_id in participants}
-
-        for r in range(1, total_rounds + 1):
-            for m in matches.filter(round_number=r):
-                if m.winner.id is None:
-                    raise ValidationError(
-                        f"В матче {m.id} не был определён победитель!"
+            # 4) Проходим по каждому раунду r и помечаем, кто вылетел
+            for r in range(1, total_rounds + 1):
+                for m in all_matches.filter(round_number=r):
+                    if m.winner_id is None:
+                        raise ValidationError(f"Матч {m.id} не имеет победителя.")
+                    loser = (
+                        m.participant_a
+                        if m.winner_id == m.participant_b_id
+                        else m.participant_b
                     )
+                    if loser and eliminated_round[loser.id] == 0:
+                        eliminated_round[loser.id] = r
+
+            # 5) Определяем финальный матч, присваиваем чемпиону eliminated_round = total_rounds+1
+            final_match = all_matches.filter(
+                round_number=total_rounds, bracket="WB"
+            ).first()
+            if final_match is None or final_match.winner_id is None:
+                raise ValidationError("Не найден финал или его победитель.")
+            champ_id = final_match.winner_id
+            eliminated_round[champ_id] = total_rounds + 1
+
+            # 6) Группируем команды по eliminated_round
+            groups = defaultdict(list)
+            for tid, rnd in eliminated_round.items():
+                groups[rnd].append(tid)
+
+            # 7) Сортируем ключи (раунды) в убывающем порядке и назначаем place
+            sorted_rounds = sorted(groups.keys(), reverse=True)
+            taken = 0
+            standings = []
+            for rnd in sorted_rounds:
+                place = taken + 1
+                for tid in groups[rnd]:
+                    standings.append(
+                        {
+                            "team_id": tid,
+                            "place": place,
+                            "eliminated_round": rnd,
+                        }
+                    )
+                taken += len(groups[rnd])
+
+            # 8) Сохраняем в JSONField и возвращаем
+            self.standings = standings
+            self.status = "finished"
+            self.save(update_fields=["standings", "status"])
+            return standings
+
+        # ===== DOUBLE-ELIMINATION =====
+        elif fmt == "double":
+            # 1) Собираем ID всех участников
+            participants = set()
+            for m in all_matches:
+                if m.participant_a_id:
+                    participants.add(m.participant_a_id)
+                if m.participant_b_id:
+                    participants.add(m.participant_b_id)
+
+            # 2) Инициализируем словари first_loss, second_loss
+            first_loss = {tid: None for tid in participants}
+            second_loss = {tid: None for tid in participants}
+
+            # 3) Перебираем матчи в порядке возрастания round_number
+            for m in all_matches.order_by("round_number"):
+                if m.winner_id is None:
+                    raise ValidationError(f"Матч {m.id} не имеет победителя.")
                 loser = (
                     m.participant_a
-                    if m.winner.id == m.participant_b_id
+                    if m.winner_id == m.participant_b_id
                     else m.participant_b
                 )
-                if loser and eliminated_round[loser.id] == 0:
-                    eliminated_round[loser.id] = r
+                if not loser:
+                    continue
+                lid = loser.id
+                if first_loss[lid] is None:
+                    # первое поражение
+                    first_loss[lid] = (m.round_number, m.bracket)
+                else:
+                    # второе поражение (финальное выбывание)
+                    second_loss[lid] = (m.round_number, m.bracket)
 
-        final_match = matches.filter(round_number=total_rounds, bracket="WB").first()
-        if final_match is None or final_match.winner.id is None:
-            raise ValidationError(
-                "Не удалось определить финальный матч или его победителя!"
-            )
-        champ_id = final_match.winner.id
+            # 4) Находим чемпиона: у него нет second_loss
+            champ_id = None
+            for tid in participants:
+                if second_loss[tid] is None:
+                    champ_id = tid
+                    break
+            if champ_id is None:
+                raise ValidationError("Не удалось определить чемпиона.")
+            # маркируем поля
+            # 5) Собираем группы с ключами (loss_count, loss_round, loss_bracket)
+            groups = defaultdict(list)
+            for tid in participants:
+                if tid == champ_id:
+                    # Чемпион: loss_count=0, loss_round большое, loss_bracket=None
+                    key = (0, 10**9, None)
+                else:
+                    if second_loss[tid] is None:
+                        # runner-up (проиграл только один раз, в финале WB)
+                        fl_round, fl_br = first_loss[tid]
+                        key = (1, fl_round, fl_br)
+                    else:
+                        # проиграл дважды
+                        sl_round, sl_br = second_loss[tid]
+                        key = (2, sl_round, sl_br)
+                groups[key].append(tid)
 
-        eliminated_round[champ_id] = total_rounds + 1
+            # 6) Сортируем ключи: по loss_count, потом по loss_round (DESC), потом по loss_bracket ("WB"<"LB")
+            def cmp_key(k):
+                loss_count, loss_round, loss_bracket = k
+                bracket_rank = 0 if loss_bracket == "WB" else 1
+                return (loss_count, -loss_round, bracket_rank)
 
-        groups = defaultdict(list)
-        for tid, rnd in eliminated_round.items():
-            groups[rnd].append(tid)
+            sorted_keys = sorted(groups.keys(), key=cmp_key)
 
-        sorted_rounds = sorted(groups.keys(), reverse=True)
+            # 7) Назначаем place
+            taken = 0
+            standings = []
+            for key in sorted_keys:
+                place = taken + 1
+                for tid in groups[key]:
+                    loss_count, loss_round, loss_bracket = key
+                    standings.append(
+                        {
+                            "team_id": tid,
+                            "place": place,
+                            "loss_count": loss_count,
+                            "loss_round": loss_round,
+                            "loss_bracket": loss_bracket,
+                        }
+                    )
+                taken += len(groups[key])
 
-        taken = 0
-        standings = []
-        for rnd in sorted_rounds:
-            place = taken + 1
-            for tid in groups[rnd]:
-                standings.append(
+            # 8) Сохраняем в JSONField и возвращаем
+            self.standings = standings
+            self.status = "finished"
+            self.save(update_fields=["standings", "status"])
+            return standings
+
+        # ===== ROUND-ROBIN =====
+        elif fmt == "round_robin":
+            # 1) Фильтруем только RR-матчи
+            rr_matches = all_matches.filter(bracket="RR")
+            # 2) Убедимся, что все RR-матчи finished
+            if rr_matches.exclude(status="finished").exists():
+                raise ValidationError("В RR-турнире есть незавершённые матчи.")
+
+            # 3) Список участников
+            participants = list(self.teams.all())
+
+            # 4) Инициализируем статистику для каждой команды
+            stats = {
+                t.id: {
+                    "points": 0,
+                    "wins": 0,
+                    "draws": 0,
+                    "losses": 0,
+                    "scored": 0,
+                    "conceded": 0,
+                }
+                for t in participants
+            }
+
+            # 5) Считаем очки и балы
+            for m in rr_matches:
+                a_id = m.participant_a_id
+                b_id = m.participant_b_id
+                sa = m.score_a
+                sb = m.score_b
+
+                stats[a_id]["scored"] += sa
+                stats[a_id]["conceded"] += sb
+                stats[b_id]["scored"] += sb
+                stats[b_id]["conceded"] += sa
+
+                if sa > sb:
+                    stats[a_id]["wins"] += 1
+                    stats[a_id]["points"] += 3
+                    stats[b_id]["losses"] += 1
+                elif sa < sb:
+                    stats[b_id]["wins"] += 1
+                    stats[b_id]["points"] += 3
+                    stats[a_id]["losses"] += 1
+                else:
+                    stats[a_id]["draws"] += 1
+                    stats[b_id]["draws"] += 1
+                    stats[a_id]["points"] += 1
+                    stats[b_id]["points"] += 1
+
+            # 6) Собираем список для сортировки
+            table = []
+            for t in participants:
+                st = stats[t.id]
+                gd = st["scored"] - st["conceded"]
+                table.append(
                     {
-                        "team_id": tid,
-                        "place": place,
-                        "eliminated_round": rnd,
+                        "team_id": t.id,
+                        "team_name": t.name,
+                        "points": st["points"],
+                        "wins": st["wins"],
+                        "draws": st["draws"],
+                        "losses": st["losses"],
+                        "scored": st["scored"],
+                        "conceded": st["conceded"],
+                        "goal_diff": gd,
                     }
                 )
-            taken += len(groups[rnd])
 
-        self.standings = standings
-        self.status = "finished"
-        self.save(update_fields=["status", "standings"])
+            # 7) Сортируем: по points ↓, goal_diff ↓, scored ↓, team_name ↑
+            table_sorted = sorted(
+                table,
+                key=lambda x: (
+                    -x["points"],
+                    -x["goal_diff"],
+                    -x["scored"],
+                    x["team_name"],
+                ),
+            )
 
-        return standings
+            # 8) Присваиваем place (tie → одинаковый place)
+            standings = []
+            prev_key = None
+            for idx, row in enumerate(table_sorted):
+                key = (row["points"], row["goal_diff"], row["scored"])
+                if prev_key is None:
+                    place = 1
+                else:
+                    place = idx + 1 if key != prev_key else standings[-1]["place"]
+                standings.append(
+                    {
+                        "team_id": row["team_id"],
+                        "team_name": row["team_name"],
+                        "place": place,
+                        "points": row["points"],
+                        "wins": row["wins"],
+                        "draws": row["draws"],
+                        "losses": row["losses"],
+                        "goal_diff": row["goal_diff"],
+                        "scored": row["scored"],
+                        "conceded": row["conceded"],
+                    }
+                )
+                prev_key = key
+
+            # 9) Сохраняем и возвращаем
+            self.standings = standings
+            self.status = "finished"
+            self.save(update_fields=["standings", "status"])
+            return standings
+
+        else:
+            raise ValidationError("Неизвестный формат турнира.")
 
 
 class Match(models.Model):

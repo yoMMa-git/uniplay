@@ -18,6 +18,8 @@ export type TournamentStatus =
   | "stopped"
   | "finished";
 
+export type MatchStatus = "ongoing" | "disputing" | "finished";
+
 export interface Game {
   id: number;
   name: string;
@@ -52,6 +54,7 @@ export interface Tournament {
   title: string;
   status: TournamentStatus;
   game: Game;
+  bracket_format: string;
   start_date: string;
   teams: Team[];
   matches: Match[];
@@ -81,7 +84,8 @@ export interface Match {
   participant_b: Team;
   score_a: number;
   score_b: number;
-  status: string;
+  status: MatchStatus;
+  bracket: string;
   tournament: Tournament;
 }
 

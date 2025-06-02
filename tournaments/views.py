@@ -1,16 +1,16 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, Count, Case, When, F, IntegerField
+from django.db.models import Q, Count, F
 from django.db import IntegrityError, transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
 
-from accounts.permissions import IsModerator, IsReferee
+from accounts.permissions import IsModerator
+import random
 
 from .models import Game, Match, Team, Tournament, Invitation
 from .utils import (
@@ -283,6 +283,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
             )
 
         teams = list(tournament.teams.all())
+        random.shuffle(teams)
 
         if len(teams) < 2:
             return Response(
@@ -522,7 +523,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         match.winner = winner
         match.status = "finished"
 
-        match.save(update_fields=["score_a", "score_b", "status"])
+        match.save(update_fields=["score_a", "score_b", "winner", "status"])
 
         with transaction.atomic():
             if match.next_match_win:
@@ -542,9 +543,9 @@ class MatchViewSet(viewsets.ModelViewSet):
                 next_match_loss = match.next_match_loss
                 if next_match_loss:
                     if next_match_loss.participant_a is None:
-                        next_match_loss.participant_a = winner
+                        next_match_loss.participant_a = loser
                     elif next_match_loss.participant_b is None:
-                        next_match_loss.participant_b = winner
+                        next_match_loss.participant_b = loser
                     else:
                         raise ValidationError(
                             {
