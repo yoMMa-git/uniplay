@@ -40,11 +40,12 @@ export default function TournamentDetail() {
   const [loadingTournament, setLoadingTournament] = useState(true);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // Новое состояние: какую секцию показываем: "participants" или "bracket"
-  const [selectedView, setSelectedView] = useState<"participants" | "bracket">(
-    "participants"
-  );
+  const [selectedView, setSelectedView] = useState<
+    "participants" | "bracket" | "results"
+  >("participants");
 
   // Загрузка данных турнира + профиль
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function TournamentDetail() {
       .then(([trRes, prRes]) => {
         const tr = trRes.data;
         setTournament(tr);
+        console.log(tr.standings);
         setTeams(tr.teams);
         setProfile(prRes.data);
       })
@@ -68,7 +70,7 @@ export default function TournamentDetail() {
       .finally(() => setLoadingTournament(false));
   }, [id]);
 
-  // Загрузка матчей, но только если статус >= 'ongoing'
+  // Загрузка матчей, но только если статус ≥ 'ongoing'
   useEffect(() => {
     if (!tournament) return;
 
@@ -102,7 +104,7 @@ export default function TournamentDetail() {
       await api.post(`/tournaments/${tournament.id}/generate_bracket/`);
       toast.success("Сетка успешно сгенерирована!");
 
-      // Обновляем данные турнира и команд
+      // Обновляем турнир и команды
       const trRes = await api.get<Tournament>(`/tournaments/${tournament.id}/`);
       setTournament(trRes.data);
       setTeams(trRes.data.teams);
@@ -121,6 +123,33 @@ export default function TournamentDetail() {
     }
   };
 
+  // Новый обработчик: Завершить турнир
+  const handleFinishTournament = async () => {
+    if (!tournament) return;
+    if (!window.confirm("Вы уверены, что хотите завершить этот турнир?")) {
+      return;
+    }
+    setIsFinishing(true);
+    try {
+      const res = await api.post<{ standings: any[] }>(
+        `/tournaments/${tournament.id}/complete/`
+      );
+      console.log(res);
+      toast.success("Турнир успешно завершён.");
+      // Обновляем статус турнира
+      setTournament({
+        ...tournament,
+        status: "finished",
+      });
+      // Можно сохранить res.data.standings в отдельный state, если нужно
+    } catch (e: any) {
+      console.error(e.response?.data || e);
+      toast.error(e.response?.data?.detail || "Не удалось завершить турнир");
+    } finally {
+      setIsFinishing(false);
+    }
+  };
+
   if (loadingTournament) {
     return <div>Загрузка турнира…</div>;
   }
@@ -128,8 +157,10 @@ export default function TournamentDetail() {
     return <div>Турнир не найден</div>;
   }
 
-  const isAdminOrMod =
-    profile && (profile.role === "admin" || profile.role === "moderator");
+  const userRole = profile?.role || "";
+  const isAdminOrMod = userRole === "admin" || userRole === "moderator";
+  // Суды также могут завершать, следовательно:
+  const canFinish = userRole !== "player" && tournament.status === "ongoing";
 
   return (
     <div className="p-6 space-y-6">
@@ -149,6 +180,7 @@ export default function TournamentDetail() {
             <Badge variant="secondary">{tournament.status}</Badge>
           </p>
 
+          {/* Кнопка для генерации сетки (только при статусе registration) */}
           {isAdminOrMod && tournament.status === "registration" && (
             <Button
               className="mt-4"
@@ -157,6 +189,24 @@ export default function TournamentDetail() {
             >
               {isGenerating ? "Генерация…" : "Generate Bracket"}
             </Button>
+          )}
+
+          {/* Кнопка "Завершить турнир" */}
+          {canFinish && (
+            <Button
+              variant="destructive"
+              className="mt-4 ml-4"
+              onClick={handleFinishTournament}
+              disabled={isFinishing}
+            >
+              {isFinishing ? "Завершение…" : "Завершить турнир"}
+            </Button>
+          )}
+
+          {tournament.status === "finished" && (
+            <p className="mt-4 text-green-600 font-medium">
+              Турнир завершён. Итоги можно посмотреть в разделе «Итоги турнира».
+            </p>
           )}
         </CardContent>
       </Card>
@@ -175,6 +225,7 @@ export default function TournamentDetail() {
           <SelectContent>
             <SelectItem value="participants">Участники</SelectItem>
             <SelectItem value="bracket">Сетка</SelectItem>
+            <SelectItem value="results">Итоги</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -208,7 +259,7 @@ export default function TournamentDetail() {
                         </Link>
                       </TableCell>
                       <TableCell className="px-4 py-2 whitespace-nowrap">
-                        {/* {team.wins_in_tournament} / {team.losses_in_tournament} */}
+                        {team.wins_in_tournament} / {team.losses_in_tournament}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -232,6 +283,48 @@ export default function TournamentDetail() {
               <Bracket matches={matches} />
             ) : (
               <p>Сетка ещё не сформирована или нет матчей.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Секция результатов */}
+      {selectedView === "results" && (
+        <Card>
+          <CardContent>
+            <h2 className="text-xl font-semibold mb-4">Итоги турнира</h2>
+
+            {tournament.standings && Array.isArray(tournament.standings) ? (
+              <Table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-center">Место</TableHead>
+                    <TableHead className="text-center">Команда</TableHead>
+                    <TableHead className="text-center">Раунд вылета</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tournament.standings.map((item: any) => {
+                    // Найдём полное имя команды по её ID из списка teams:
+                    const teamObj = teams.find((t) => t.id === item.team_id);
+                    return (
+                      <TableRow key={item.team_id}>
+                        <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                          {item.place}
+                        </TableCell>
+                        <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                          {teamObj ? teamObj.name : `Team #${item.team_id}`}
+                        </TableCell>
+                        <TableCell className="px-4 py-2 text-center whitespace-nowrap">
+                          {item.eliminated_round}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <p>Итоги ещё не доступны.</p>
             )}
           </CardContent>
         </Card>

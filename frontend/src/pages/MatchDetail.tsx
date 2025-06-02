@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "@/api/axios";
+import { getFullUrl } from "@/utils/getFullUrl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
-import type { User, Match, Tournament } from "@/types";
+import type { User, Match } from "@/types";
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>();
@@ -72,12 +73,19 @@ export default function MatchDetail() {
     return <div className="p-6">Матч не найден</div>;
   }
 
-  // Проверяем права текущего пользователя
-  const isCaptainA = profile?.id === match.participant_a.captain.id;
-  const isCaptainB = profile?.id === match.participant_b.captain.id;
+  // Проверяем права текущего пользователя (капитаны A и B, судья)
+  const isCaptainA = profile?.id === match.participant_a?.captain?.id;
+  const isCaptainB = profile?.id === match.participant_b?.captain?.id;
   const isReferee =
     profile?.role === "referee" &&
     match.tournament.referees.map((ref) => ref.id).includes(profile.id);
+
+  const avatarA = match.participant_a?.avatar
+    ? getFullUrl(match.participant_a.avatar)
+    : "";
+  const avatarB = match.participant_b?.avatar
+    ? getFullUrl(match.participant_b.avatar)
+    : "";
 
   // Функция обновления данных матча после действий
   const reloadMatch = async () => {
@@ -95,7 +103,6 @@ export default function MatchDetail() {
     setIsSubmittingResult(true);
     try {
       // Предполагаемый endpoint: POST /matches/:id/result/
-      // payload: { score_a, score_b }
       await api.post(`/matches/${match.id}/result/`, {
         score_a: scoreA,
         score_b: scoreB,
@@ -121,7 +128,6 @@ export default function MatchDetail() {
         text: appealText,
       });
       toast.success("Жалоба отправлена");
-      // После жалобы переводим матч в disputed
       await reloadMatch();
       setAppealText("");
       setAppealModalOpen(false);
@@ -147,46 +153,68 @@ export default function MatchDetail() {
       <div className="grid grid-cols-3 gap-6">
         {/* Левая колонка: Команда A */}
         <div className="flex flex-col items-center space-y-4">
-          {match.participant_a.avatar ? (
-            <img
-              src={match.participant_a.avatar}
-              alt="Logo A"
-              className="w-32 h-32 object-cover rounded-full"
-            />
+          {match.participant_a ? (
+            <>
+              {avatarA ? (
+                <img
+                  src={avatarA}
+                  alt={`Logo ${match.participant_a.name}`}
+                  className="w-32 h-32 object-cover rounded-full"
+                  onError={(e) =>
+                    ((e.target as HTMLImageElement).style.display = "none")
+                  }
+                />
+              ) : (
+                <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center text-xl">
+                  {match.participant_a.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <h2 className="text-lg font-semibold">
+                {match.participant_a.name}
+              </h2>
+              <div className="w-full">
+                <h3 className="text-sm font-medium mb-1 text-center">
+                  Игроки:
+                </h3>
+                <div className="space-y-2">
+                  {match.participant_a.members.map((m) => {
+                    const memberAvatar = m.avatar ? getFullUrl(m.avatar) : "";
+                    return (
+                      <div key={m.id} className="flex items-center space-x-3">
+                        {memberAvatar ? (
+                          <img
+                            src={memberAvatar}
+                            alt={`avatar ${m.username}`}
+                            className="w-8 h-8 rounded-full object-cover"
+                            onError={(e) =>
+                              ((e.target as HTMLImageElement).style.display =
+                                "none")
+                            }
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs">
+                            {m.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex flex-col">
+                          <span className="font-medium">{m.username}</span>
+                          {m.real_name && (
+                            <span className="text-xs text-gray-500">
+                              {m.real_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           ) : (
-            <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center text-xl">
-              {match.participant_a.name.charAt(0).toUpperCase()}
+            <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center">
+              <span className="text-lg font-medium">Бай</span>
             </div>
           )}
-          <h2 className="text-lg font-semibold">{match.participant_a.name}</h2>
-          <div className="w-full">
-            <h3 className="text-sm font-medium mb-1 text-center">Игроки:</h3>
-            <div className="space-y-2">
-              {match.participant_a.members.map((m) => (
-                <div key={m.id} className="flex items-center space-x-3">
-                  {m.avatar ? (
-                    <img
-                      src={m.avatar}
-                      alt="avatar"
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs">
-                      {m.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex flex-col">
-                    <span className="font-medium">{m.username}</span>
-                    {m.real_name && (
-                      <span className="text-xs text-gray-500">
-                        {m.real_name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Центральная колонка: Детали матча */}
@@ -194,15 +222,24 @@ export default function MatchDetail() {
           {/* Дата проведения и общий счёт */}
           <div className="text-center space-y-2">
             <p className="text-sm text-gray-600">
-              {new Date(match.start_date).toLocaleString()}
+              {new Date(match.start_time).toLocaleString("ru-RU", {
+                timeZoneName: "longOffset",
+              })}
             </p>
-            <h1 className="text-2xl font-bold">
-              {match.score_a} : {match.score_b}
-            </h1>
+
+            {match.participant_a && match.participant_b ? (
+              <h1 className="text-2xl font-bold">
+                {match.score_a} : {match.score_b}
+              </h1>
+            ) : (
+              <h1 className="text-2xl font-bold">Бай</h1>
+            )}
           </div>
 
           {/* Кнопка «Загрузить результат» (только для судьи или капитанов) */}
           {match.status === "ongoing" &&
+            match.participant_a &&
+            match.participant_b &&
             (isReferee || isCaptainA || isCaptainB) && (
               <div className="flex justify-center">
                 <Dialog
@@ -264,59 +301,83 @@ export default function MatchDetail() {
               </div>
             )}
 
-          {/* Кнопка «Обратиться к судье» */}
-          <div className="flex justify-center mt-4">
-            <Button
-              variant="destructive"
-              onClick={() => setAppealModalOpen(true)}
-            >
-              Обратиться к судье
-            </Button>
-          </div>
+          {/* Кнопка «Обратиться к судье» (только для капитанов) */}
+          {(isCaptainA || isCaptainB) && (
+            <div className="flex justify-center mt-4">
+              <Button
+                variant="destructive"
+                onClick={() => setAppealModalOpen(true)}
+              >
+                Обратиться к судье
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Правая колонка: Команда B */}
         <div className="flex flex-col items-center space-y-4">
-          {match.participant_b.avatar ? (
-            <img
-              src={match.participant_b.avatar}
-              alt="Logo B"
-              className="w-32 h-32 object-cover rounded-full"
-            />
+          {match.participant_b ? (
+            <>
+              {avatarB ? (
+                <img
+                  src={avatarB}
+                  alt={`Logo ${match.participant_b.name}`}
+                  className="w-32 h-32 object-cover rounded-full"
+                  onError={(e) =>
+                    ((e.target as HTMLImageElement).style.display = "none")
+                  }
+                />
+              ) : (
+                <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center text-xl">
+                  {match.participant_b.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <h2 className="text-lg font-semibold">
+                {match.participant_b.name}
+              </h2>
+              <div className="w-full">
+                <h3 className="text-sm font-medium mb-1 text-center">
+                  Игроки:
+                </h3>
+                <div className="space-y-2">
+                  {match.participant_b.members.map((m) => {
+                    const memberAvatar = m.avatar ? getFullUrl(m.avatar) : "";
+                    return (
+                      <div key={m.id} className="flex items-center space-x-3">
+                        {memberAvatar ? (
+                          <img
+                            src={memberAvatar}
+                            alt={`avatar ${m.username}`}
+                            className="w-8 h-8 rounded-full object-cover"
+                            onError={(e) =>
+                              ((e.target as HTMLImageElement).style.display =
+                                "none")
+                            }
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs">
+                            {m.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex flex-col">
+                          <span className="font-medium">{m.username}</span>
+                          {m.real_name && (
+                            <span className="text-xs text-gray-500">
+                              {m.real_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           ) : (
-            <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center text-xl">
-              {match.participant_b.name.charAt(0).toUpperCase()}
+            <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center">
+              <span className="text-lg font-medium">Бай</span>
             </div>
           )}
-          <h2 className="text-lg font-semibold">{match.participant_b.name}</h2>
-          <div className="w-full">
-            <h3 className="text-sm font-medium mb-1 text-center">Игроки:</h3>
-            <div className="space-y-2">
-              {match.participant_b.members.map((m) => (
-                <div key={m.id} className="flex items-center space-x-3">
-                  {m.avatar ? (
-                    <img
-                      src={m.avatar}
-                      alt="avatar"
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs">
-                      {m.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex flex-col">
-                    <span className="font-medium">{m.username}</span>
-                    {m.real_name && (
-                      <span className="text-xs text-gray-500">
-                        {m.real_name}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 

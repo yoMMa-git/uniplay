@@ -24,6 +24,29 @@ export interface Game {
   max_players_per_team: number;
 }
 
+export interface Standing {
+  team_id: number;
+  place: number;
+
+  // для single-elimination:
+  eliminated_round?: number;
+
+  // для double-elimination:
+  loss_count?: number;
+  loss_round?: number;
+  loss_bracket?: "WB" | "LB" | null;
+
+  // для round-robin:
+  points?: number;
+  wins?: number;
+  draws?: number;
+  losses?: number;
+  goal_diff?: number;
+  scored?: number;
+  conceded?: number;
+  team_name?: string; // можно дублировать имя, но обычно берётся из Team по team_id
+}
+
 export interface Tournament {
   id: number;
   title: string;
@@ -34,6 +57,7 @@ export interface Tournament {
   matches: Match[];
   referees: User[];
   moderators: User[];
+  standings: Standing[];
 }
 
 export interface Team {
@@ -52,7 +76,7 @@ export interface Team {
 export interface Match {
   id: number;
   round_number: number;
-  start_date: string;
+  start_time: string;
   participant_a: Team;
   participant_b: Team;
   score_a: number;

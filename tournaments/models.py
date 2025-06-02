@@ -1,5 +1,9 @@
+from collections import defaultdict
+
 from django.conf import settings
 from django.db import models
+from django.db.models import Q, F, Max
+from django.core.exceptions import ValidationError
 
 User = settings.AUTH_USER_MODEL
 
@@ -69,13 +73,19 @@ class Tournament(models.Model):
         ("finished", "Завершён"),
     ]
 
+    # Информативные поля
     title = models.CharField(max_length=200)
     game = models.ForeignKey(Game, on_delete=models.PROTECT, related_name="tournaments")
     prize_pool = models.DecimalField(max_digits=12, decimal_places=2)
     start_date = models.DateField(null=True)
+
+    # Поля для логики
     bracket_format = models.CharField(max_length=20, choices=FORMAT_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     teams = models.ManyToManyField(Team, related_name="tournaments", blank=True)
+    standings = models.JSONField(null=True, blank=True)
+
+    # M2M-поля
     moderators = models.ManyToManyField(
         User,
         related_name="moderated_tournaments",
@@ -91,6 +101,91 @@ class Tournament(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.status})"
+
+    def finalize(self):
+        """
+        Завершение SE турнира и расставление мест.
+        Возвращает словарь с расположением команд по местам.
+        Алгоритм:
+        - Проверяем, что все матчи завершены
+        - Фиксируем максимальное количество раундов и собираем множество всех участников
+        - Словарь eliminated_round: по умолчанию у всех 0, потом по каждому этапу проходим и записываем, кто в каком раунде выбыл
+        - По отсортированным уникальным раундам раскидываем места и формируем конечный словарь
+        """
+
+        if self.status != "ongoing":
+            raise ValidationError(
+                "Закончить можно только тот турнир, который проходит на данный момент!"
+            )
+
+        matches = self.matches.all()
+
+        still_playing = matches.exclude(status="finished")
+        if still_playing.exists():
+            raise ValidationError("Не все матчи были завершены!")
+
+        agg = matches.aggregate(max_round=Max("round_number"))
+        total_rounds = agg["max_round"]
+        if total_rounds is None:
+            raise ValidationError("В турнире нет ни одного матча, нечего завершать.")
+
+        participants = set()
+        for m in matches:
+            if m.participant_a_id:
+                participants.add(m.participant_a_id)
+            if m.participant_b_id:
+                participants.add(m.participant_b_id)
+
+        eliminated_round = {team_id: 0 for team_id in participants}
+
+        for r in range(1, total_rounds + 1):
+            for m in matches.filter(round_number=r):
+                if m.winner.id is None:
+                    raise ValidationError(
+                        f"В матче {m.id} не был определён победитель!"
+                    )
+                loser = (
+                    m.participant_a
+                    if m.winner.id == m.participant_b_id
+                    else m.participant_b
+                )
+                if loser and eliminated_round[loser.id] == 0:
+                    eliminated_round[loser.id] = r
+
+        final_match = matches.filter(round_number=total_rounds, bracket="WB").first()
+        if final_match is None or final_match.winner.id is None:
+            raise ValidationError(
+                "Не удалось определить финальный матч или его победителя!"
+            )
+        champ_id = final_match.winner.id
+
+        eliminated_round[champ_id] = total_rounds + 1
+
+        groups = defaultdict(list)
+        for tid, rnd in eliminated_round.items():
+            groups[rnd].append(tid)
+
+        sorted_rounds = sorted(groups.keys(), reverse=True)
+
+        taken = 0
+        standings = []
+        for rnd in sorted_rounds:
+            place = taken + 1
+            for tid in groups[rnd]:
+                standings.append(
+                    {
+                        "team_id": tid,
+                        "place": place,
+                        "eliminated_round": rnd,
+                    }
+                )
+            taken += len(groups[rnd])
+
+        self.standings = standings
+        self.status = "finished"
+        self.save(update_fields=["status", "standings"])
+
+        return standings
 
 
 class Match(models.Model):
@@ -158,6 +253,17 @@ class Match(models.Model):
             "participant_b",
         )
         ordering = ["round_number", "bracket", "id"]
+
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    Q(winner__isnull=True)
+                    | Q(winner=F("participant_a"))
+                    | Q(winner=F("participant_b"))
+                ),
+                name="match_winner_must_be_participant",
+            )
+        ]
 
     def __str__(self):
         return f"{self.tournament.title} | Round {self.round_number}: {self.participant_a} vs {self.participant_b}"

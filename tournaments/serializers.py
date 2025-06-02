@@ -81,6 +81,7 @@ class TournamentSerializer(serializers.ModelSerializer):
     teams = TeamSerializer(many=True, read_only=True)
     moderators = serializers.StringRelatedField(many=True, read_only=True)
     referees = serializers.StringRelatedField(many=True, read_only=True)
+    standings = serializers.JSONField(read_only=True)
 
     class Meta:
         model = Tournament
@@ -95,6 +96,7 @@ class TournamentSerializer(serializers.ModelSerializer):
             "teams",
             "moderators",
             "referees",
+            "standings",
         )
 
 

@@ -59,9 +59,7 @@ export default function Bracket({ matches }: BracketProps) {
                           {m.participant_a ? m.participant_a.name : "BYE"}
                         </span>
                         <span className="font-semibold text-sm text-right">
-                          {m.result?.team_a_score != null
-                            ? m.result.team_a_score
-                            : "--"}
+                          {m.score_a != null ? m.score_a : "--"}
                         </span>
                       </div>
                       <Separator className="my-1" />
@@ -70,9 +68,7 @@ export default function Bracket({ matches }: BracketProps) {
                           {m.participant_b ? m.participant_b.name : "BYE"}
                         </span>
                         <span className="font-semibold text-sm text-right">
-                          {m.result?.team_b_score != null
-                            ? m.result.team_b_score
-                            : "--"}
+                          {m.score_b != null ? m.score_b : "--"}
                         </span>
                       </div>
                     </div>

@@ -2,7 +2,20 @@
 
 import math
 from django.db import transaction
+from datetime import timedelta
+from django.utils import timezone
 from .models import Match, Team, Tournament
+
+
+def get_next_full_hour():
+    """
+    Возвращает текущий момент, округленный до ближайшего полного часа вперёд
+    """
+    now = timezone.now()
+    rounded = now.replace(minute=0, second=0, microsecond=0)
+    if now.minute != 0 or now.second != 0 or now.microsecond != 0:
+        rounded += timedelta(hours=1)
+    return rounded
 
 
 def generate_single_bracket(tournament: Tournament, teams: list[Team]):
@@ -33,11 +46,15 @@ def generate_single_bracket(tournament: Tournament, teams: list[Team]):
     #    Структура: matches_by_round[r] = [список Match-объектов для раунда r]
     matches_by_round: dict[int, list[Match]] = {r: [] for r in range(1, rounds + 1)}
 
+    # Вычисляем стартовый базовый час
+    base_time = get_next_full_hour()
+
     # Используем transaction.atomic, чтобы на случай ошибки все записи откатились
     with transaction.atomic():
         # 4.1. Создадим все матчи для каждого раунда (без участников).
         for r in range(1, rounds + 1):
             matches_in_round = total_slots // (2**r)
+            round_time = base_time + timedelta(hours=(r - 1))
             for i in range(matches_in_round):
                 m = Match.objects.create(
                     tournament=tournament,
@@ -45,6 +62,7 @@ def generate_single_bracket(tournament: Tournament, teams: list[Team]):
                     bracket="WB",  # Winners Bracket
                     participant_a=None,
                     participant_b=None,
+                    start_time=round_time,
                 )
                 matches_by_round[r].append(m)
 
@@ -91,10 +109,14 @@ def generate_double_bracket(tournament: Tournament, teams: list[Team]):
     matches_wb: dict[int, list[Match]] = {r: [] for r in range(1, rounds_wb + 1)}
     matches_lb: dict[int, list[Match]] = {}
 
+    # Базовое время
+    base_time = get_next_full_hour()
+
     with transaction.atomic():
         # 1) Создаём ВСЕ матчи WB без участников, аналогично single-elimination
         for r in range(1, rounds_wb + 1):
             count = total_slots // (2**r)
+            round_time = base_time + timedelta(hours=(r - 1))
             for i in range(count):
                 m = Match.objects.create(
                     tournament=tournament,
@@ -102,6 +124,7 @@ def generate_double_bracket(tournament: Tournament, teams: list[Team]):
                     bracket="WB",
                     participant_a=None,
                     participant_b=None,
+                    start_time=round_time,
                 )
                 matches_wb[r].append(m)
 
@@ -138,6 +161,7 @@ def generate_double_bracket(tournament: Tournament, teams: list[Team]):
             else:
                 # оставшиеся раунды LB формируются между победителями LB
                 match_count = 2 ** (total_lb_rounds - r)
+                round_time = base_time + timedelta(hours=(r - 1))
             for i in range(match_count):
                 m = Match.objects.create(
                     tournament=tournament,
@@ -145,6 +169,7 @@ def generate_double_bracket(tournament: Tournament, teams: list[Team]):
                     bracket="LB",
                     participant_a=None,
                     participant_b=None,
+                    start_time=round_time,
                 )
                 matches_lb[r].append(m)
 
@@ -189,6 +214,7 @@ def generate_double_bracket(tournament: Tournament, teams: list[Team]):
             bracket="WB",  # Финал «наверху», т.к. выигрывает победитель WB при ничьей
             participant_a=None,
             participant_b=None,
+            start_time=base_time + timedelta(hours=rounds_wb),
         )
         # Связываем победителей
         wb_final.next_match_win = final_match

@@ -31,7 +31,7 @@ export default function TournamentCreate() {
     "draft" | "registration" | "ongoing" | "finished"
   >("registration");
   const [games, setGames] = useState<Game[]>([]);
-  const [error, setError] = useState("");
+  const [error] = useState("");
 
   useEffect(() => {
     api.get("/games/").then((res) => setGames(res.data));

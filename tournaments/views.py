@@ -1,7 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Count, Case, When, F, IntegerField
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -395,6 +395,25 @@ class TournamentViewSet(viewsets.ModelViewSet):
         tournament.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["post"], url_path="complete")
+    def complete(self, request, pk=None):
+        tournament = self.get_object()
+
+        user = request.user
+
+        if user.role == "player":
+            return Response(
+                {"detail": "У вас недостаточно прав для совершения этой операции"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            result = tournament.finalize()
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result, status.HTTP_200_OK)
+
 
 class MatchViewSet(viewsets.ModelViewSet):
     """
@@ -407,6 +426,7 @@ class MatchViewSet(viewsets.ModelViewSet):
     queryset = Match.objects.all()
     serializer_class = MatchSerializer
     permission_classes = [IsAuthenticated]
+
     filter_backends = [DjangoFilterBackend]
     filterset_fields = [
         "status",
@@ -434,6 +454,14 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="result")
     def upload_result(self, request, pk=None):
+        """
+        POST /matches/{id}/result/
+        1) Проверяем права (капитан или судья)
+        2) Проверяем статус матча и присутствие обоих участников
+        3) Проверяем счёт во избежании отрицательных значений и равенства
+        4) Сохранение score_a, score_b, победителя и статуса
+        5) Продвижение победителя по сетке вверх и проигравшего по сетке вниз (если это предусмотрено)
+        """
         match = get_object_or_404(Match, pk=pk)
         user = request.user
 
@@ -455,15 +483,77 @@ class MatchViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if match.participant_a is None or match.participant_b is None:
+            return Response(
+                {"detail": 'Нельзя выставить результат для матча с "байером"'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = MatchResultSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        match.score_a = data["score_a"]
-        match.score_b = data["score_b"]
+        score_a = data["score_a"]
+        score_b = data["score_b"]
+
+        if score_a < 0 or score_b < 0:
+            return Response(
+                {"detail": "Счёт не может быть отрицательным"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (score_a == score_b) and (
+            match.tournament.bracket_format in ["single", "double"]
+        ):
+            return Response(
+                {"detail": "Ничья недопустима для данного формата турнира."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        match.score_a = score_a
+        match.score_b = score_b
+        if score_a > score_b:
+            winner = match.participant_a
+            loser = match.participant_b
+        else:
+            winner = match.participant_b
+            loser = match.participant_a
+
+        match.winner = winner
         match.status = "finished"
+
         match.save(update_fields=["score_a", "score_b", "status"])
 
+        with transaction.atomic():
+            if match.next_match_win:
+                next_match_win = match.next_match_win
+                if next_match_win.participant_a is None:
+                    next_match_win.participant_a = winner
+                elif next_match_win.participant_b is None:
+                    next_match_win.participant_b = winner
+                else:
+                    raise ValidationError(
+                        {
+                            "detail": f"Не удалось продвинуть победителя в следующий матч (ID = {next_match_win.id}): оба слота заняты."
+                        }
+                    )
+                next_match_win.save(update_fields=["participant_a", "participant_b"])
+            if getattr(match, "next_match_loss", None):
+                next_match_loss = match.next_match_loss
+                if next_match_loss:
+                    if next_match_loss.participant_a is None:
+                        next_match_loss.participant_a = winner
+                    elif next_match_loss.participant_b is None:
+                        next_match_loss.participant_b = winner
+                    else:
+                        raise ValidationError(
+                            {
+                                "detail": f"Не удалось продвинуть победителя в следующий матч (ID = {next_match_loss.id}): оба слота заняты."
+                            }
+                        )
+                    next_match_loss.save(
+                        update_fields=["participant_a", "participant_b"]
+                    )
         return Response(
             {
                 "detail": "Результат успешно сохранён!",
@@ -474,6 +564,10 @@ class MatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="appeal")
     def appeal(self, request, pk=None):
+        """
+        POST /matches/{id}/appeal/
+        Разрешённые роли: капитаны любой участвующей команды
+        """
         match = get_object_or_404(Match, pk=pk)
         user = request.user
 
@@ -488,9 +582,9 @@ class MatchViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if match.status == "ongoing":
+        if match.status != "finished":
             return Response(
-                {"detail": "Жалобу можно подать только после окончания матча"},
+                {"detail": "Жалобу можно подать только после окончания матча."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -503,18 +597,3 @@ class MatchViewSet(viewsets.ModelViewSet):
         match.save(update_fields=["dispute_notes", "status"])
 
         return Response({"detail": "Жалоба успешно подана!"}, status=status.HTTP_200_OK)
-
-    # queryset = Match.objects.all()
-    # serializer_class = MatchSerializer
-    # filter_backends = [DjangoFilterBackend]
-    # filterset_fields = [
-    #     "status",
-    #     "tournament__referees",
-    #     "participant_a__members",
-    #     "participant_b__members",
-    # ]
-
-    # def get_permissions(self):
-    #     if self.action in ["update", "partial_update"]:
-    #         return [IsAuthenticated(), IsReferee()]
-    #     return [IsAuthenticated()]

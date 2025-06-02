@@ -96,7 +96,7 @@ export default function TeamDetail() {
         setHasMore(Boolean(res.data.next));
       })
       .catch(console.error);
-  }, [debounced, page, inviteOpen]);
+  }, [debounced, page, inviteOpen, profile]);
 
   // Приглашение игрока
   const handleInvite = async (userId: number) => {
@@ -115,13 +115,13 @@ export default function TeamDetail() {
     }
   };
 
-  const handleAvatar = async (file: File) => {
-    const fd = new FormData();
-    fd.append("avatar", file);
-    await api.patch(`/teams/${team?.id}`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  };
+  // const handleAvatar = async (file: File) => {
+  //   const fd = new FormData();
+  //   fd.append("avatar", file);
+  //   await api.patch(`/teams/${team?.id}`, fd, {
+  //     headers: { "Content-Type": "multipart/form-data" },
+  //   });
+  // };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!team || !e.target.files?.[0]) return;

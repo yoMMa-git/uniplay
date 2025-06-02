@@ -195,7 +195,7 @@ export default function TournamentsTable({
   const handleDelete = async (id: number) => {
     if (!window.confirm("Удалить этот турнир?")) return;
     try {
-      res = await api.delete(`/tournaments/${id}/`);
+      const res = await api.delete(`/tournaments/${id}/`);
       console.log(res);
       setTournaments((curr) => curr.filter((t) => t.id !== id));
     } catch (err: any) {

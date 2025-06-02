@@ -31,7 +31,7 @@ export default function MatchesList() {
   useEffect(() => {
     if (profile === null) return;
     setLoading(true);
-    // Просто обычный GET: бекенд уже фильтрует матчи из draft-турниров
+    // Получаем все матчи (бэкенд сам отфильтровывает draft-турниры)
     api
       .get<Match[]>("/matches/")
       .then((res) => setMatches(res.data))
@@ -43,7 +43,18 @@ export default function MatchesList() {
     return <div className="p-6">Загрузка…</div>;
   }
 
-  // Проверяем, может ли пользователь создавать/редактировать матчи
+  // Фильтруем только те матчи, где пользователь участвует (в составе participant_a или participant_b)
+  const userId = profile.id;
+  const userMatches = matches.filter((m) => {
+    const aMembers = m.participant_a?.members || [];
+    const bMembers = m.participant_b?.members || [];
+    // проверяем, есть ли текущий пользователь среди участников A или B
+    const inA = aMembers.some((member) => member.id === userId);
+    const inB = bMembers.some((member) => member.id === userId);
+    return inA || inB;
+  });
+
+  // Может ли пользователь управлять матчами (admin или moderator)
   const canManage = profile.role === "admin" || profile.role === "moderator";
 
   return (
@@ -57,7 +68,7 @@ export default function MatchesList() {
         )}
       </div>
 
-      {matches.length > 0 ? (
+      {userMatches.length > 0 ? (
         <div className="overflow-x-auto">
           <Table className="min-w-full divide-y divide-gray-200 shadow-sm rounded-lg">
             <TableHeader>
@@ -73,7 +84,7 @@ export default function MatchesList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {matches.map((m, idx) => (
+              {userMatches.map((m, idx) => (
                 <TableRow key={m.id}>
                   <TableCell className="px-4 py-2 text-center whitespace-nowrap">
                     {idx + 1}
@@ -90,13 +101,25 @@ export default function MatchesList() {
                     {m.round_number}
                   </TableCell>
                   <TableCell className="px-4 py-2 text-center whitespace-nowrap">
-                    {m.participant_a.name}
+                    {m.participant_a ? (
+                      m.participant_a.name
+                    ) : (
+                      <span className="italic text-gray-500">Бай</span>
+                    )}
                   </TableCell>
                   <TableCell className="px-4 py-2 text-center whitespace-nowrap">
-                    {m.participant_b.name}
+                    {m.participant_b ? (
+                      m.participant_b.name
+                    ) : (
+                      <span className="italic text-gray-500">Бай</span>
+                    )}
                   </TableCell>
                   <TableCell className="px-4 py-2 text-center whitespace-nowrap">
-                    {m.score_a} : {m.score_b}
+                    {m.participant_a && m.participant_b ? (
+                      `${m.score_a} : ${m.score_b}`
+                    ) : (
+                      <span className="text-gray-500">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="px-4 py-2 text-center whitespace-nowrap">
                     <Badge variant="secondary">{m.status}</Badge>
