@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "react-toastify";
 import api from "../api/axios";
-import type { Tournament, Team } from "../types";
+import type { Tournament, Team, TournamentStatus } from "../types";
+import { tournamentStatusLabels } from "@/utils/statusLabels";
 
 interface Profile {
   id: number;
@@ -235,17 +236,19 @@ export default function TournamentsTable({
                 </TableCell>
                 <TableCell>{t.game.name}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{t.status}</Badge>
+                  <Badge variant="secondary">
+                    {tournamentStatusLabels[t.status as TournamentStatus]}
+                  </Badge>
                 </TableCell>
                 <TableCell className="space-x-2">
                   {["registration", "ongoing"].includes(t.status) &&
                     (role === "admin" || role === "moderator") && (
                       <Button
                         size="sm"
-                        variant="secondary"
+                        variant="destructive"
                         onClick={() => handleStop(t.id)}
                       >
-                        Stop
+                        Остановить
                       </Button>
                     )}
                   {["draft", "stopped"].includes(t.status) &&
@@ -255,7 +258,7 @@ export default function TournamentsTable({
                         variant="destructive"
                         onClick={() => handleDelete(t.id)}
                       >
-                        Delete
+                        Удалить
                       </Button>
                     )}
 

@@ -24,6 +24,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { tournamentStatusLabels } from "@/utils/statusLabels";
+import { getFullUrl } from "@/utils/getFullUrl"; // импорт утилиты для логотипа
 
 interface Profile {
   id: number;
@@ -43,7 +44,6 @@ export default function TournamentDetail() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // Новое состояние: какую секцию показываем: "participants", "bracket" или "results"
   const [selectedView, setSelectedView] = useState<
     "participants" | "bracket" | "results"
   >("participants");
@@ -61,6 +61,7 @@ export default function TournamentDetail() {
         const tr = trRes.data;
         setTournament(tr);
         setTeams(tr.teams);
+        console.log(tr.teams);
         setProfile(prRes.data);
       })
       .catch((err) => {
@@ -70,7 +71,7 @@ export default function TournamentDetail() {
       .finally(() => setLoadingTournament(false));
   }, [id]);
 
-  // Загрузка матчей, но только если статус ≥ 'ongoing'
+  // Загрузка матчей (по статусу)
   useEffect(() => {
     if (!tournament) return;
 
@@ -104,12 +105,10 @@ export default function TournamentDetail() {
       await api.post(`/tournaments/${tournament.id}/generate_bracket/`);
       toast.success("Сетка успешно сгенерирована!");
 
-      // Обновляем турнир и команды
       const trRes = await api.get<Tournament>(`/tournaments/${tournament.id}/`);
       setTournament(trRes.data);
       setTeams(trRes.data.teams);
 
-      // Обновляем матчи
       const mtRes = await api.get<Match[]>(`/matches/`, {
         params: { tournament: tournament.id },
       });
@@ -123,7 +122,6 @@ export default function TournamentDetail() {
     }
   };
 
-  // Новый обработчик: Завершить турнир
   const handleFinishTournament = async () => {
     if (!tournament) return;
     if (!window.confirm("Вы уверены, что хотите завершить этот турнир?")) {
@@ -131,10 +129,9 @@ export default function TournamentDetail() {
     }
     setIsFinishing(true);
     try {
-      const res = await api.post<{ standings: any[] }>(
+      await api.post<{ standings: any[] }>(
         `/tournaments/${tournament.id}/complete/`
       );
-      console.log(res);
       toast.success("Турнир успешно завершён.");
       setTournament({
         ...tournament,
@@ -159,11 +156,9 @@ export default function TournamentDetail() {
   const isAdminOrMod = userRole === "admin" || userRole === "moderator";
   const canFinish = userRole !== "player" && tournament.status === "ongoing";
 
-  // Для Double-Elimination: отдельные списки матчей WB и LB
   const wbMatches = matches.filter((m) => m.bracket === "WB");
   const lbMatches = matches.filter((m) => m.bracket === "LB");
 
-  // Для Round-Robin: сгруппируем матчи по раундам
   const rrMatchesByRound: Record<number, Match[]> = {};
   if (tournament.bracket_format === "round_robin") {
     matches.forEach((m) => {
@@ -174,6 +169,11 @@ export default function TournamentDetail() {
     });
   }
 
+  // Получаем полный URL логотипа игры (если есть)
+  const logoUrl = tournament.game.logo
+    ? getFullUrl(tournament.game.logo)
+    : null;
+
   return (
     <div className="p-6 space-y-6">
       <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -183,49 +183,59 @@ export default function TournamentDetail() {
       {/* Информация о турнире */}
       <Card>
         <CardContent>
-          <h1 className="text-2xl font-bold">{tournament.title}</h1>
-          <p>
-            <strong>Дисциплина:</strong> {tournament.game.name}
-          </p>
-          <p>
-            <strong>Формат:</strong>{" "}
-            <Badge variant="secondary">{tournament.bracket_format}</Badge>
-          </p>
-          <p>
-            <strong>Статус:</strong>{" "}
-            <Badge variant="secondary">
-              {tournamentStatusLabels[tournament.status as TournamentStatus]}
-            </Badge>
-          </p>
+          <div className="relative">
+            {/* Логотип игры в правом верхнем углу */}
+            {logoUrl && (
+              <img
+                src={logoUrl}
+                alt={`${tournament.game.name} Logo`}
+                className="absolute top-4 right-4 w-16 h-16 rounded-md object-cover"
+              />
+            )}
 
-          {/* Кнопка для генерации сетки (только при статусе registration) */}
-          {isAdminOrMod && tournament.status === "registration" && (
-            <Button
-              className="mt-4"
-              onClick={handleGenerateBracket}
-              disabled={isGenerating}
-            >
-              {isGenerating ? "Генерация…" : "Generate Bracket"}
-            </Button>
-          )}
-
-          {/* Кнопка "Завершить турнир" */}
-          {canFinish && (
-            <Button
-              variant="destructive"
-              className="mt-4 ml-4"
-              onClick={handleFinishTournament}
-              disabled={isFinishing}
-            >
-              {isFinishing ? "Завершение…" : "Завершить турнир"}
-            </Button>
-          )}
-
-          {tournament.status === "finished" && (
-            <p className="mt-4 text-green-600 font-medium">
-              Турнир завершён. Итоги можно посмотреть в разделе «Итоги турнира».
+            <h1 className="text-2xl font-bold">{tournament.title}</h1>
+            <p>
+              <strong>Дисциплина:</strong> {tournament.game.name}
             </p>
-          )}
+            <p>
+              <strong>Формат:</strong>{" "}
+              <Badge variant="secondary">{tournament.bracket_format}</Badge>
+            </p>
+            <p>
+              <strong>Статус:</strong>{" "}
+              <Badge variant="secondary">
+                {tournamentStatusLabels[tournament.status as TournamentStatus]}
+              </Badge>
+            </p>
+
+            {isAdminOrMod && tournament.status === "registration" && (
+              <Button
+                className="mt-4"
+                onClick={handleGenerateBracket}
+                disabled={isGenerating}
+              >
+                {isGenerating ? "Генерация…" : "Generate Bracket"}
+              </Button>
+            )}
+
+            {canFinish && (
+              <Button
+                variant="destructive"
+                className="mt-4 ml-4"
+                onClick={handleFinishTournament}
+                disabled={isFinishing}
+              >
+                {isFinishing ? "Завершение…" : "Завершить турнир"}
+              </Button>
+            )}
+
+            {tournament.status === "finished" && (
+              <p className="mt-4 text-green-600 font-medium">
+                Турнир завершён. Итоги можно посмотреть в разделе «Итоги
+                турнира».
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -259,7 +269,7 @@ export default function TournamentDetail() {
                   <TableRow>
                     <TableHead>Название</TableHead>
                     <TableHead>Капитан</TableHead>
-                    <TableHead>Статистика в турнире</TableHead>
+                    <TableHead>Статистика команды (W/L)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -277,7 +287,7 @@ export default function TournamentDetail() {
                         </Link>
                       </TableCell>
                       <TableCell className="px-4 py-2 whitespace-nowrap">
-                        {team.wins_in_tournament} / {team.losses_in_tournament}
+                        {team.wins_count} / {team.losses_count}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -294,7 +304,6 @@ export default function TournamentDetail() {
       {selectedView === "bracket" && (
         <div className="space-y-6">
           {tournament.bracket_format === "round_robin" ? (
-            // ===== Round-Robin =====
             <Card>
               <CardContent>
                 <h2 className="text-xl font-semibold mb-4">
@@ -364,7 +373,6 @@ export default function TournamentDetail() {
               </CardContent>
             </Card>
           ) : tournament.bracket_format === "single" ? (
-            // ===== Single-Elimination =====
             <Card>
               <CardContent>
                 <h2 className="text-xl font-semibold mb-4">Сетка Single</h2>
@@ -378,9 +386,7 @@ export default function TournamentDetail() {
               </CardContent>
             </Card>
           ) : (
-            // ===== Double-Elimination: разделяем WB и LB =====
             <>
-              {/* Верхняя сетка */}
               <Card>
                 <CardContent>
                   <h2 className="text-xl font-semibold mb-4">
@@ -396,7 +402,6 @@ export default function TournamentDetail() {
                 </CardContent>
               </Card>
 
-              {/* Нижняя сетка */}
               <Card>
                 <CardContent>
                   <h2 className="text-xl font-semibold mb-4">
@@ -428,7 +433,9 @@ export default function TournamentDetail() {
                   <TableRow>
                     <TableHead className="text-center">Место</TableHead>
                     <TableHead className="text-center">Команда</TableHead>
-                    <TableHead className="text-center">Раунд вылета</TableHead>
+                    <TableHead className="text-center">
+                      Статистика (победы/поражения)
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -443,7 +450,7 @@ export default function TournamentDetail() {
                           {teamObj ? teamObj.name : `Team #${item.team_id}`}
                         </TableCell>
                         <TableCell className="px-4 py-2 text-center whitespace-nowrap">
-                          {item.eliminated_round}
+                          {item.wins} / {item.losses}
                         </TableCell>
                       </TableRow>
                     );

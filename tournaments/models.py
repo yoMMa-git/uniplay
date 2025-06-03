@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q, F, Max
 from django.core.exceptions import ValidationError
 
@@ -13,6 +13,7 @@ class Game(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     max_players_per_team = models.PositiveIntegerField()
+    logo = models.ImageField(upload_to="game_logos/", blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -155,24 +156,28 @@ class Tournament(models.Model):
             # 2) Собираем ID всех участников
             participants = set()
             for m in all_matches:
-                if m.participant_a_id:
-                    participants.add(m.participant_a_id)
-                if m.participant_b_id:
-                    participants.add(m.participant_b_id)
+                if m.participant_a.id:
+                    participants.add(m.participant_a.id)
+                if m.participant_b.id:
+                    participants.add(m.participant_b.id)
 
             # 3) Инициализируем eliminated_round = 0 для всех
             eliminated_round = {tid: 0 for tid in participants}
+            wins = {tid: 0 for tid in participants}
+            losses = {tid: 0 for tid in participants}
 
             # 4) Проходим по каждому раунду r и помечаем, кто вылетел
             for r in range(1, total_rounds + 1):
                 for m in all_matches.filter(round_number=r):
-                    if m.winner_id is None:
+                    if m.winner.id is None:
                         raise ValidationError(f"Матч {m.id} не имеет победителя.")
                     loser = (
                         m.participant_a
-                        if m.winner_id == m.participant_b_id
+                        if m.winner.id == m.participant_b.id
                         else m.participant_b
                     )
+                    wins[m.winner.id] += 1
+                    losses[loser.id] += 1
                     if loser and eliminated_round[loser.id] == 0:
                         eliminated_round[loser.id] = r
 
@@ -180,9 +185,9 @@ class Tournament(models.Model):
             final_match = all_matches.filter(
                 round_number=total_rounds, bracket="WB"
             ).first()
-            if final_match is None or final_match.winner_id is None:
+            if final_match is None or final_match.winner.id is None:
                 raise ValidationError("Не найден финал или его победитель.")
-            champ_id = final_match.winner_id
+            champ_id = final_match.winner.id
             eliminated_round[champ_id] = total_rounds + 1
 
             # 6) Группируем команды по eliminated_round
@@ -202,6 +207,8 @@ class Tournament(models.Model):
                             "team_id": tid,
                             "place": place,
                             "eliminated_round": rnd,
+                            "wins": wins.get(tid, 0),
+                            "losses": losses.get(tid, 0),
                         }
                     )
                 taken += len(groups[rnd])
@@ -225,16 +232,20 @@ class Tournament(models.Model):
             # 2) Инициализируем словари first_loss, second_loss
             first_loss = {tid: None for tid in participants}
             second_loss = {tid: None for tid in participants}
+            wins = {tid: 0 for tid in participants}
+            losses = {tid: 0 for tid in participants}
 
             # 3) Перебираем матчи в порядке возрастания round_number
             for m in all_matches.order_by("round_number"):
-                if m.winner_id is None:
+                if m.winner.id is None:
                     raise ValidationError(f"Матч {m.id} не имеет победителя.")
                 loser = (
                     m.participant_a
-                    if m.winner_id == m.participant_b_id
+                    if m.winner.id == m.participant_b.id
                     else m.participant_b
                 )
+                wins[m.winner.id] += 1
+                losses[loser.id] += 1
                 if not loser:
                     continue
                 lid = loser.id
@@ -293,6 +304,8 @@ class Tournament(models.Model):
                             "loss_count": loss_count,
                             "loss_round": loss_round,
                             "loss_bracket": loss_bracket,
+                            "wins": wins[tid],
+                            "losses": losses[tid],
                         }
                     )
                 taken += len(groups[key])
@@ -417,6 +430,53 @@ class Tournament(models.Model):
         else:
             raise ValidationError("Неизвестный формат турнира.")
 
+    def recalculate_bracket(self):
+        if self.bracket_format != "single":
+            return
+
+        matches = self.matches.order_by("round_number", "id")
+
+        with transaction.atomic():
+            for m in matches:
+                if m.status != "finished" or not m.winner.id:
+                    continue
+                winner_id = m.winner.id
+
+                next_match = m.next_match_win
+                if not next_match:
+                    continue
+
+                if (
+                    next_match.participant_a_id == winner_id
+                    or next_match.participant_b_id == winner_id
+                ):
+                    continue
+
+                old_a = next_match.participant_a_id
+                old_b = next_match.participant_b_id
+                pid_a = m.participant_a_id
+                pid_b = m.participant_b_id
+
+                if old_a in (pid_a, pid_b):
+                    next_match.participant_a_id = winner_id
+                elif old_b in (pid_a, pid_b):
+                    next_match.participant_b_id = winner_id
+
+                next_match.score_a = 0
+                next_match.score_b = 0
+                next_match.winner = None
+                next_match.status = "ongoing"
+                next_match.save(
+                    update_fields=[
+                        "score_a",
+                        "score_b",
+                        "winner",
+                        "status",
+                        "participant_a",
+                        "participant_b",
+                    ]
+                )
+
 
 class Match(models.Model):
     """Матч между двумя командами в рамках турнира"""
@@ -474,6 +534,7 @@ class Match(models.Model):
     start_time = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ongoing")
     dispute_notes = models.TextField(blank=True, null=True)
+    resolution_notes = models.TextField(blank=True, null=True)
 
     class Meta:
         unique_together = (

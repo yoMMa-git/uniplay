@@ -1,6 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, Count, F
+from django.db.models import Q, Count, F, Prefetch
 from django.db import IntegrityError, transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -58,25 +58,37 @@ class TeamViewSet(viewsets.ModelViewSet):
             qs = qs.filter(Q(captain=user) | Q(members=user)).distinct()
 
         return qs.annotate(
-            tournaments_count=Count("tournaments"),
-            matches_count=Count("matches_as_a", distinct=True)
-            + Count("matches_as_b", distinct=True),
-            wins_count=Count(
-                "matches_as_a", filter=Q(matches_as_a__winner=F("id")), distinct=True
+            tournaments_count=Count("tournaments", distinct=True),
+            matches_count=Count(
+                "matches_as_a", filter=Q(matches_as_a__status="finished"), distinct=True
             )
             + Count(
-                "matches_as_b", filter=Q(matches_as_b__winner=F("id")), distinct=True
+                "matches_as_b", filter=Q(matches_as_b__status="finished"), distinct=True
+            ),
+            wins_count=Count(
+                "matches_as_a",
+                filter=Q(matches_as_a__winner=F("id"))
+                & Q(matches_as_a__status="finished"),
+                distinct=True,
+            )
+            + Count(
+                "matches_as_b",
+                filter=Q(matches_as_b__winner=F("id"))
+                & Q(matches_as_b__status="finished"),
+                distinct=True,
             ),
             losses_count=Count(
                 "matches_as_a",
                 filter=Q(matches_as_a__winner__isnull=False)
-                & ~Q(matches_as_a__winner=F("id")),
+                & ~Q(matches_as_a__winner=F("id"))
+                & Q(matches_as_a__status="finished"),
                 distinct=True,
             )
             + Count(
                 "matches_as_b",
                 filter=Q(matches_as_b__winner__isnull=False)
-                & ~Q(matches_as_b__winner=F("id")),
+                & ~Q(matches_as_b__winner=F("id"))
+                & Q(matches_as_b__status="finished"),
                 distinct=True,
             ),
         )
@@ -253,7 +265,50 @@ class TournamentViewSet(viewsets.ModelViewSet):
         """
         Контекстно-ролевая фильтрация: убирает черновые турниры для игроков и судей
         """
-        qs = Tournament.objects.all()
+        qs = Tournament.objects.all().prefetch_related(
+            Prefetch(
+                "teams",
+                queryset=Team.objects.annotate(
+                    tournaments_count=Count("tournaments", distinct=True),
+                    matches_count=Count(
+                        "matches_as_a",
+                        filter=Q(matches_as_a__status="finished"),
+                        distinct=True,
+                    )
+                    + Count(
+                        "matches_as_b",
+                        filter=Q(matches_as_b__status="finished"),
+                        distinct=True,
+                    ),
+                    wins_count=Count(
+                        "matches_as_a",
+                        filter=Q(matches_as_a__winner=F("id"))
+                        & Q(matches_as_a__status="finished"),
+                        distinct=True,
+                    )
+                    + Count(
+                        "matches_as_b",
+                        filter=Q(matches_as_b__winner=F("id"))
+                        & Q(matches_as_b__status="finished"),
+                        distinct=True,
+                    ),
+                    losses_count=Count(
+                        "matches_as_a",
+                        filter=Q(matches_as_a__winner__isnull=False)
+                        & ~Q(matches_as_a__winner=F("id"))
+                        & Q(matches_as_a__status="finished"),
+                        distinct=True,
+                    )
+                    + Count(
+                        "matches_as_b",
+                        filter=Q(matches_as_b__winner__isnull=False)
+                        & ~Q(matches_as_b__winner=F("id"))
+                        & Q(matches_as_b__status="finished"),
+                        distinct=True,
+                    ),
+                ),
+            )
+        )
         user = self.request.user
         if user.role not in ["admin", "moderator"]:
             qs = qs.exclude(status="draft")
@@ -594,7 +649,67 @@ class MatchViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
 
         match.dispute_notes = data["text"]
-        match.status = "disputed"
+        match.status = "disputing"
         match.save(update_fields=["dispute_notes", "status"])
 
         return Response({"detail": "Жалоба успешно подана!"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="resolve")
+    def resolve(self, request, pk=None):
+        match = self.get_object()
+        user = request.user
+
+        if (
+            user.role != "referee"
+            or user.id not in match.tournament.referees.values_list("id", flat=True)
+        ):
+            return Response(
+                {"detail": "У вас недостаточно прав для совершения этой операции"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        score_a = request.data.get("score_a")
+        score_b = request.data.get("score_b")
+        comment = request.data.get("comment", "")
+
+        if score_a is None or score_b is None:
+            return Response(
+                {"detail": "Осутствует одно или несколько необходимых полей"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            match.score_a = int(score_a)
+            match.score_b = int(score_b)
+            match.resolution_notes = comment
+        except (ValueError, TypeError):
+            return Response(
+                {"detail": "Неверный формат данных."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        else:
+            # Определяем победителя: participant_a или participant_b
+            if match.participant_a and match.participant_b:
+                if score_a > score_b:
+                    match.winner = match.participant_a
+                elif score_b > score_a:
+                    match.winner = match.participant_b
+                else:
+                    # Ничья запрещена в single-elimination; можно вернуть ошибку
+                    return Response(
+                        {"detail": "Ничья невозможна, укажите разный счёт."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:
+                # Если один из участников отсутствует (бай), трактуем как автоматического победителя
+                match.winner = match.participant_a or match.participant_b
+            match.status = "finished"
+            match.save(update_fields=["score_a", "score_b", "status", "winner"])
+
+        tournament = match.tournament
+
+        tournament.recalculate_bracket()  # TODO: this method not exists yet
+        print("all good!")
+
+        serializer = self.get_serializer(match)
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,5 +1,7 @@
 // src/types.ts
 
+export type UserRole = "admin" | "moderator" | "referee" | "player";
+
 export interface User {
   id: number;
   username: string;
@@ -7,7 +9,7 @@ export interface User {
   phone: string;
   avatar: string;
   real_name: string;
-  role: "admin" | "moderator" | "referee" | "player";
+  role: UserRole;
   is_email_verified: boolean;
 }
 
@@ -24,6 +26,7 @@ export interface Game {
   id: number;
   name: string;
   max_players_per_team: number;
+  logo: string;
 }
 
 export interface Standing {

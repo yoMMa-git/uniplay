@@ -17,20 +17,20 @@ import { Input } from "@/components/ui/input";
 import { toast } from "react-toastify";
 import type { Team, User } from "../types";
 
+// Импорт вашей утилиты
+import { getFullUrl } from "@/utils/getFullUrl";
+
 export default function TeamDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // Основные данные
   const [team, setTeam] = useState<Team | null>(null);
   const [loadingTeam, setLoadingTeam] = useState(true);
-
-  // Профиль (для проверки прав)
   const [profile, setProfile] = useState<{ id: number; role?: string } | null>(
     null
   );
 
-  // Состояния модалки
+  // Состояния модалки приглашения
   const [inviteOpen, setInviteOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -39,11 +39,11 @@ export default function TeamDetail() {
   const [hasMore, setHasMore] = useState(false);
   const [inviting, setInviting] = useState<Record<number, boolean>>({});
 
-  // Выгрузка аватара
+  // Для загрузки аватара команды
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // Загрузка команды и профиля
+  // Загрузка данных команды и профиля
   useEffect(() => {
     if (!id) return;
     setLoadingTeam(true);
@@ -59,18 +59,15 @@ export default function TeamDetail() {
       .finally(() => setLoadingTeam(false));
   }, [id]);
 
-  // Подгрузка аватара
+  // Формируем полный URL для аватара команды с помощью getFullUrl
   useEffect(() => {
     if (team?.avatar) {
-      const base = import.meta.env.VITE_APP_URL || "http://localhost:8000";
-      const url = team.avatar.startsWith("http")
-        ? team.avatar
-        : `${base}${team.avatar}`;
+      const url = getFullUrl(team.avatar);
       setAvatarUrl(url);
     }
   }, [team]);
 
-  // Debounce поиска
+  // Debounce для поиска пользователей
   useEffect(() => {
     const h = setTimeout(() => {
       setDebounced(searchTerm);
@@ -80,7 +77,7 @@ export default function TeamDetail() {
     return () => clearTimeout(h);
   }, [searchTerm]);
 
-  // Загрузка игроков при открытой модалке, при debounced или page
+  // Загрузка игроков при открытой модалке
   useEffect(() => {
     if (!inviteOpen) return;
     api
@@ -102,10 +99,8 @@ export default function TeamDetail() {
   const handleInvite = async (userId: number) => {
     setInviting((prev) => ({ ...prev, [userId]: true }));
     try {
-      console.log(team!.id);
       await api.post(`/teams/${team!.id}/invite/`, { invitee_id: userId });
       toast.success("Приглашение отправлено");
-      // удаляем из списка
       setUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch (e: any) {
       console.error(e);
@@ -115,27 +110,18 @@ export default function TeamDetail() {
     }
   };
 
-  // const handleAvatar = async (file: File) => {
-  //   const fd = new FormData();
-  //   fd.append("avatar", file);
-  //   await api.patch(`/teams/${team?.id}`, fd, {
-  //     headers: { "Content-Type": "multipart/form-data" },
-  //   });
-  // };
-
+  // Загрузка нового аватара команды
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!team || !e.target.files?.[0]) return;
     const fd = new FormData();
     fd.append("avatar", e.target.files[0]);
     try {
-      const patchRes = await api.patch<Team>(`/teams/${team.id}/`, fd, {
+      await api.patch<Team>(`/teams/${team.id}/`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      console.log("PATCH response:", patchRes.data.avatar);
       const tr = await api.get<Team>(`/teams/${team.id}/`);
-      console.log("GET after patch:", tr.data);
       setTeam(tr.data);
-      setAvatarUrl(tr.data.avatar ?? null);
+      setAvatarUrl(tr.data.avatar ? getFullUrl(tr.data.avatar) : null);
       toast.success("Аватар обновлён");
     } catch (err) {
       console.error(err);
@@ -157,6 +143,7 @@ export default function TeamDetail() {
       <Button variant="ghost" onClick={() => navigate(-1)}>
         ← Назад
       </Button>
+
       <Card className="relative w-full">
         <CardContent>
           <div className="absolute top-4 right-4">
@@ -192,43 +179,75 @@ export default function TeamDetail() {
           <p>
             <strong>Капитан:</strong> {team.captain.username}
           </p>
-          <p>Tournaments: {team.tournaments_count}</p>
-          <p>Matches: {team.matches_count}</p>
-          <p>Winrate: {team.wins_count / team.losses_count}</p>
+          <p>Турниры: {team.tournaments_count}</p>
+          <p>Матчи: {team.matches_count}</p>
+          <p>
+            Процент побед:{" "}
+            {Number(
+              (team.wins_count / (team.losses_count + team.wins_count)).toFixed(
+                4
+              )
+            ) * 100}
+            %
+          </p>
+
+          {/* Секция с участниками, где выводятся аватары */}
           <h2 className="mt-4 font-semibold">
             Участники ({team.members.length}):
           </h2>
           <ul className="list-none">
-            {team.members.map((m) => (
-              <li
-                key={m.id}
-                className="flex item-center justify-between py-2 border-b last:border-0"
-              >
-                <span>{m.username}</span>
-                {profile?.id === team.captain.id && m.id !== profile.id && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="ml-4"
-                    onClick={() =>
-                      api
-                        .post(`/teams/${team.id}/remove_member/`, {
-                          user_id: m.id,
-                        })
-                        .then(() => {
-                          setTeam((prev) => ({
-                            ...prev!,
-                            members: prev!.members.filter((x) => x.id !== m.id),
-                          }));
-                        })
-                    }
-                  >
-                    Выгнать
-                  </Button>
-                )}
-              </li>
-            ))}
+            {team.members.map((m) => {
+              // Используем getFullUrl для формирования URL аватара пользователя
+              const userAvatar = getFullUrl(m.avatar);
+
+              return (
+                <li
+                  key={m.id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
+                  <div className="flex items-center space-x-3">
+                    {userAvatar ? (
+                      <img
+                        src={userAvatar}
+                        alt={`${m.username} Avatar`}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs">
+                        {m.username.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span>{m.username}</span>
+                  </div>
+
+                  {profile?.id === team.captain.id && m.id !== profile.id && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="ml-4"
+                      onClick={() =>
+                        api
+                          .post(`/teams/${team.id}/remove_member/`, {
+                            user_id: m.id,
+                          })
+                          .then(() => {
+                            setTeam((prev) => ({
+                              ...prev!,
+                              members: prev!.members.filter(
+                                (x) => x.id !== m.id
+                              ),
+                            }));
+                          })
+                      }
+                    >
+                      Выгнать
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
+
           {canInvite ? (
             <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
               <DialogTrigger asChild>
@@ -239,8 +258,6 @@ export default function TeamDetail() {
                   <DialogTitle>Пригласить игрока</DialogTitle>
                   <DialogDescription>Поиск по нику:</DialogDescription>
                 </DialogHeader>
-
-                {/* Поисковая строка */}
                 <div className="mt-2">
                   <Input
                     placeholder="Введите ник"
@@ -248,8 +265,6 @@ export default function TeamDetail() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-
-                {/* Список результатов */}
                 <div className="max-h-60 overflow-auto mt-4 space-y-2">
                   {users?.map((u) => (
                     <div
@@ -273,8 +288,6 @@ export default function TeamDetail() {
                     </p>
                   )}
                 </div>
-
-                {/* Кнопка "Загрузить ещё" */}
                 {hasMore && (
                   <div className="text-center mt-2">
                     <Button size="sm" onClick={() => setPage((p) => p + 1)}>
@@ -282,7 +295,6 @@ export default function TeamDetail() {
                     </Button>
                   </div>
                 )}
-
                 <DialogFooter>
                   <Button
                     variant="outline"
@@ -300,6 +312,7 @@ export default function TeamDetail() {
               </p>
             )
           )}
+
           {team.members.some((m) => m.id === profile?.id) &&
             profile?.id !== team.captain.id && (
               <div className="mt-6">

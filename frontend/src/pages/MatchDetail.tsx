@@ -30,7 +30,7 @@ export default function MatchDetail() {
   const [profile, setProfile] = useState<User | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // Для модалки «Загрузить результат» всего матча
+  // Для модалки «Загрузить результат»
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [scoreA, setScoreA] = useState<number>(0);
   const [scoreB, setScoreB] = useState<number>(0);
@@ -40,6 +40,13 @@ export default function MatchDetail() {
   const [appealModalOpen, setAppealModalOpen] = useState(false);
   const [appealText, setAppealText] = useState("");
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+
+  // Для модалки «Разрешить спор»
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [resolveScoreA, setResolveScoreA] = useState<number>(0);
+  const [resolveScoreB, setResolveScoreB] = useState<number>(0);
+  const [resolveComment, setResolveComment] = useState("");
+  const [isSubmittingResolve, setIsSubmittingResolve] = useState(false);
 
   // Загрузить профиль
   useEffect(() => {
@@ -57,7 +64,6 @@ export default function MatchDetail() {
     api
       .get<Match>(`/matches/${id}/`)
       .then((res) => {
-        console.log(res.data);
         setMatch(res.data);
       })
       .catch((err) => {
@@ -80,6 +86,7 @@ export default function MatchDetail() {
   const isReferee =
     profile?.role === "referee" &&
     match.tournament.referees.map((ref) => ref.id).includes(profile.id);
+  console.log(match.tournament.referees);
 
   const avatarA = match.participant_a?.avatar
     ? getFullUrl(match.participant_a.avatar)
@@ -103,7 +110,6 @@ export default function MatchDetail() {
     if (!match) return;
     setIsSubmittingResult(true);
     try {
-      // Предполагаемый endpoint: POST /matches/:id/result/
       await api.post(`/matches/${match.id}/result/`, {
         score_a: scoreA,
         score_b: scoreB,
@@ -124,7 +130,6 @@ export default function MatchDetail() {
     if (!match) return;
     setIsSubmittingAppeal(true);
     try {
-      // Предполагаемый endpoint: POST /matches/:id/appeal/
       await api.post(`/matches/${match.id}/appeal/`, {
         text: appealText,
       });
@@ -137,6 +142,28 @@ export default function MatchDetail() {
       toast.error("Не удалось отправить жалобу");
     } finally {
       setIsSubmittingAppeal(false);
+    }
+  };
+
+  // Разрешение спора (для судьи)
+  const handleSubmitResolve = async () => {
+    if (!match) return;
+    setIsSubmittingResolve(true);
+    try {
+      await api.post(`/matches/${match.id}/resolve/`, {
+        score_a: resolveScoreA,
+        score_b: resolveScoreB,
+        comment: resolveComment,
+      });
+      toast.success("Спор разрешён");
+      await reloadMatch();
+      setResolveComment("");
+      setResolveModalOpen(false);
+    } catch (err: any) {
+      console.error(err.response?.data || err);
+      toast.error("Не удалось разрешить спор");
+    } finally {
+      setIsSubmittingResolve(false);
     }
   };
 
@@ -239,6 +266,14 @@ export default function MatchDetail() {
             )}
           </div>
 
+          {/* Показ текста жалобы, если матч в состоянии «disputing» */}
+          {isReferee && match.status === "disputing" && match.appeal_text && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
+              <h3 className="font-semibold mb-1">Текст жалобы:</h3>
+              <p className="text-sm whitespace-pre-wrap">{match.appeal_text}</p>
+            </div>
+          )}
+
           {/* Кнопка «Загрузить результат» (только для судьи или капитанов) */}
           {match.status === "ongoing" &&
             match.participant_a &&
@@ -304,8 +339,8 @@ export default function MatchDetail() {
               </div>
             )}
 
-          {/* Кнопка «Обратиться к судье» (только для капитанов) */}
-          {(isCaptainA || isCaptainB) && (
+          {/* Кнопка «Обратиться к судье» (только для капитанов и если матч не в споре) */}
+          {(isCaptainA || isCaptainB) && match.status !== "disputing" && (
             <div className="flex justify-center mt-4">
               <Button
                 variant="destructive"
@@ -313,6 +348,84 @@ export default function MatchDetail() {
               >
                 Обратиться к судье
               </Button>
+            </div>
+          )}
+
+          {/* Кнопка «Разрешить спор» (только для судьи и если матч в споре) */}
+          {isReferee && match.status === "disputing" && (
+            <div className="flex justify-center mt-4">
+              <Dialog
+                open={resolveModalOpen}
+                onOpenChange={setResolveModalOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button size="lg" variant="secondary">
+                    Разрешить спор
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Разрешить спор</DialogTitle>
+                    <DialogDescription>
+                      Укажите новый счёт и оставьте комментарий
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="resolveScoreA">
+                        Новый счёт {match.participant_a?.name}:
+                      </Label>
+                      <Input
+                        id="resolveScoreA"
+                        type="number"
+                        value={resolveScoreA}
+                        onChange={(e) =>
+                          setResolveScoreA(Number(e.target.value))
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="resolveScoreB">
+                        Новый счёт {match.participant_b?.name}:
+                      </Label>
+                      <Input
+                        id="resolveScoreB"
+                        type="number"
+                        value={resolveScoreB}
+                        onChange={(e) =>
+                          setResolveScoreB(Number(e.target.value))
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="resolveComment">Комментарий:</Label>
+                      <textarea
+                        id="resolveComment"
+                        className="w-full border rounded px-2 py-1"
+                        rows={3}
+                        value={resolveComment}
+                        onChange={(e) => setResolveComment(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setResolveModalOpen(false)}
+                    >
+                      Отмена
+                    </Button>
+                    <Button
+                      onClick={handleSubmitResolve}
+                      disabled={isSubmittingResolve}
+                    >
+                      {isSubmittingResolve ? "Отправляем..." : "Отправить"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 // src/pages/Dashboard.tsx
 import { useEffect, useState } from "react";
-import api from "../api/axios";
+import api from "@/api/axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -16,7 +16,8 @@ import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import TournamentsTable from "./TournamentsTable";
-import type { Game, Tournament, User, Match } from "../types";
+import type { Game, Tournament, User, Match, UserRole } from "../types";
+import { userRolesLabels } from "@/utils/statusLabels";
 
 export default function Dashboard() {
   const chartConfig = {
@@ -55,7 +56,7 @@ export default function Dashboard() {
       .then((res) => setProfile(res.data))
       .catch(() => setProfile(null));
     api.get("/games/").then((res) => setGames(res.data));
-    api.get("/auth/users/").then((res) => setUserCount(res.data.length));
+    api.get("/users/").then((res) => setUserCount(res.data.count));
     api.get("/tournaments/").then((res) => setTournamentCount(res.data.length));
   }, []);
 
@@ -90,18 +91,12 @@ export default function Dashboard() {
         .then((res) => setPendingDisputes(res.data));
     }
     if (profile.role === "player") {
-      const now = new Date().toISOString();
-      const inHour = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       const paramsA = {
         status: "ongoing",
-        // timestamp__gte: now,
-        // timestamp__lte: inHour,
         participant_a__members: profile.id,
       };
       const paramsB = {
         status: "ongoing",
-        // start_time__gte: now,
-        // start_time__lte: inHour,
         participant_b__members: profile.id,
       };
 
@@ -115,7 +110,6 @@ export default function Dashboard() {
           combined.forEach((m) => {
             unique[m.id] = m;
           });
-          console.log(unique);
           setUpcomingMatches(Object.values(unique));
         })
         .catch(() => setUpcomingMatches([]));
@@ -157,19 +151,34 @@ export default function Dashboard() {
             <h2 className="text-m font-semibold">
               Добро пожаловать, {profile.username}!
             </h2>
-            <p className="mt-2 text-sm font-medium">Роль: {role}</p>
+            <p className="mt-2 text-sm font-medium">
+              Роль: {userRolesLabels[role as UserRole]}
+            </p>
           </CardContent>
         </Card>
 
         {role === "admin" && (
           <>
+            {/* Карточка "Обзор" */}
             <Card>
-              <CardContent>
-                <h3 className="text-lg font-semibold">Обзор</h3>
+              <CardHeader>
+                <CardTitle className="font-bold text-lg">Обзор</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col">
                 <p>Всего пользователей: {userCount}</p>
                 <p>Всего турниров: {tournamentCount}</p>
+              </CardContent>
+            </Card>
+
+            {/* Карточка "Быстрые действия" */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-bold text-lg">
+                  Быстрые действия
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
                 <Button
-                  className="mt-2"
                   onClick={() => {
                     const apiUrl =
                       import.meta.env.VITE_API_URL ||
@@ -180,8 +189,15 @@ export default function Dashboard() {
                 >
                   Перейти в админ-панель
                 </Button>
+                <Button
+                  onClick={() => (window.location.href = "/tournaments/create")}
+                >
+                  Создать турнир
+                </Button>
               </CardContent>
             </Card>
+
+            {/* Карточка с графиком новых турниров */}
             <Card>
               <CardContent>
                 <h3 className="text-lg font-semibold mb-2">Новые турниры</h3>
@@ -241,7 +257,7 @@ export default function Dashboard() {
                 ))}
               </CardContent>
             </Card>
-            <Card className="grid grid-cols-1 gap-1">
+            <Card>
               <CardHeader>
                 <CardTitle className="font-bold text-lg">
                   Быстрые действия

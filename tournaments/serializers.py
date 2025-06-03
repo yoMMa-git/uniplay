@@ -11,7 +11,7 @@ User = get_user_model()
 class GameSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
-        fields = ("id", "name", "max_players_per_team")
+        fields = ("id", "name", "max_players_per_team", "logo")
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -79,8 +79,8 @@ class InvitationSerializer(serializers.ModelSerializer):
 class TournamentSerializer(serializers.ModelSerializer):
     game = GameSerializer(read_only=True)
     teams = TeamSerializer(many=True, read_only=True)
-    moderators = serializers.StringRelatedField(many=True, read_only=True)
-    referees = serializers.StringRelatedField(many=True, read_only=True)
+    moderators = UserSerializer(many=True, read_only=True)
+    referees = UserSerializer(many=True, read_only=True)
     standings = serializers.JSONField(read_only=True)
 
     class Meta:
@@ -144,6 +144,7 @@ class MatchSerializer(serializers.ModelSerializer):
             "start_time",
             "status",
             "dispute_notes",
+            "resolution_notes",
         )
 
 
