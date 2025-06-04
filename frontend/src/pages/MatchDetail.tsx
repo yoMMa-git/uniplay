@@ -267,10 +267,12 @@ export default function MatchDetail() {
           </div>
 
           {/* Показ текста жалобы, если матч в состоянии «disputing» */}
-          {isReferee && match.status === "disputing" && match.appeal_text && (
+          {isReferee && match.status === "disputing" && match.dispute_notes && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
               <h3 className="font-semibold mb-1">Текст жалобы:</h3>
-              <p className="text-sm whitespace-pre-wrap">{match.appeal_text}</p>
+              <p className="text-sm whitespace-pre-wrap">
+                {match.dispute_notes}
+              </p>
             </div>
           )}
 

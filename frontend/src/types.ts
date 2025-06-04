@@ -90,6 +90,7 @@ export interface Match {
   status: MatchStatus;
   bracket: string;
   tournament: Tournament;
+  dispute_notes: string;
 }
 
 export interface Invitation {

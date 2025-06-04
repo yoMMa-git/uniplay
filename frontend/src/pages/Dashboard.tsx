@@ -28,9 +28,9 @@ export default function Dashboard() {
   } satisfies ChartConfig;
 
   const [profile, setProfile] = useState<User | null>(null);
-  const [games, setGames] = useState<Game[]>([]);
+  const [, setGames] = useState<Game[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [selectedGame, setSelectedGame] = useState<number | "">("");
+  const [selectedGame] = useState<number | "">("");
 
   // Admin metrics
   const [userCount, setUserCount] = useState<number>(0);
